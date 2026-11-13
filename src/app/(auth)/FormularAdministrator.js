@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5, Feather } from '@expo/vector-icons';
 
 export default function FormularAdministrator() {
   const [nume, setNume] = useState('');
+  const [prenume, setPrenume] = useState('');
   const [cnp, setCnp] = useState('');
-  const [email, setEmail] = useState('');
-  const [telefon, setTelefon] = useState('');
+  const [specializare, setSpecializare] = useState('');
+  const [spital, setSpital] = useState('');
+  const [parafa, setParafa] = useState('');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -19,14 +21,19 @@ export default function FormularAdministrator() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Câmpul 1: Nume+Prenume */}
+        {/* Text explicativ */}
+        <Text style={styles.description}>
+          Acest formular se completeaza de catre medic pentru a obtine accesul pe platforma Medly.
+        </Text>
+
+        {/* 1. Nume */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Nume+Prenume</Text>
+          <Text style={styles.label}>Nume</Text>
           <View style={styles.inputWrapper}>
             <Ionicons name="person-outline" size={20} color="#7b8292" style={styles.icon} />
             <TextInput
               style={styles.input}
-              placeholder="Enter your name"
+              placeholder="Introduceti Numele de Familie"
               placeholderTextColor="#9ba1b0"
               value={nume}
               onChangeText={setNume}
@@ -34,14 +41,29 @@ export default function FormularAdministrator() {
           </View>
         </View>
 
-        {/* Câmpul 2: CNP */}
+        {/* 2. Prenume */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Prenume</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="person-outline" size={20} color="#7b8292" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Introduceti Prenumele"
+              placeholderTextColor="#9ba1b0"
+              value={prenume}
+              onChangeText={setPrenume}
+            />
+          </View>
+        </View>
+
+        {/* 3. CNP */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>CNP</Text>
           <View style={styles.inputWrapper}>
-            <Ionicons name="card-outline" size={20} color="#7b8292" style={styles.icon} />
+            <Ionicons name="lock-closed-outline" size={20} color="#7b8292" style={styles.icon} />
             <TextInput
               style={styles.input}
-              placeholder="Enter your CNP"
+              placeholder="Intreoduceti CNP-ul"
               placeholderTextColor="#9ba1b0"
               value={cnp}
               onChangeText={setCnp}
@@ -50,37 +72,57 @@ export default function FormularAdministrator() {
           </View>
         </View>
 
-        {/* Câmpul 3: Email */}
+        {/* 4. Specializare */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>Specializare</Text>
           <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={20} color="#7b8292" style={styles.icon} />
+            <MaterialCommunityIcons name="card-text-outline" size={20} color="#7b8292" style={styles.icon} />
             <TextInput
               style={styles.input}
-              placeholder="Enter your email"
+              placeholder="Alegeti specializarea"
               placeholderTextColor="#9ba1b0"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              value={specializare}
+              onChangeText={setSpecializare}
+            />
+            <Ionicons name="chevron-down" size={20} color="#7b8292" />
+          </View>
+        </View>
+
+        {/* 5. Spitalul de Provenienta */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Spitalul de Provenienta</Text>
+          <View style={styles.inputWrapper}>
+            <FontAwesome5 name="hospital" size={18} color="#7b8292" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Introduceti spitalul"
+              placeholderTextColor="#9ba1b0"
+              value={spital}
+              onChangeText={setSpital}
             />
           </View>
         </View>
 
-        {/* Câmpul 4: Telefon */}
+        {/* 6. Cod Unic de Parafa */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Număr de telefon</Text>
+          <Text style={styles.label}>Cod Unic de Parafa</Text>
           <View style={styles.inputWrapper}>
-            <Ionicons name="call-outline" size={20} color="#7b8292" style={styles.icon} />
+            <MaterialCommunityIcons name="pen" size={20} color="#7b8292" style={styles.icon} />
             <TextInput
               style={styles.input}
-              placeholder="Enter your phone"
+              placeholder="Inarcati PDF-ul"
               placeholderTextColor="#9ba1b0"
-              value={telefon}
-              onChangeText={setTelefon}
-              keyboardType="phone-pad"
+              value={parafa}
+              onChangeText={setParafa}
             />
+            <Feather name="download" size={20} color="#7b8292" />
           </View>
         </View>
+
+        {/* Buton Trimite */}
+        <TouchableOpacity activeOpacity={0.8} style={styles.submitButton}>
+          <Text style={styles.submitButtonText}>Trimite</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -108,20 +150,28 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   scrollContent: {
-    alignItems: 'center', // Centrează tot conținutul pe mijloc pe orizontală
-    paddingVertical: 30,
+    alignItems: 'center',
+    paddingVertical: 20,
     paddingHorizontal: 20,
+  },
+  description: {
+    fontSize: 13,
+    color: '#333333',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    lineHeight: 18,
   },
   inputContainer: {
     width: '100%',
-    maxWidth: 400, // Limitează lățimea pe ecrane mari (web/tablets) ca să arate perfect centrat
-    marginBottom: 20,
+    maxWidth: 400,
+    marginBottom: 16,
   },
   label: {
     fontSize: 13,
     color: '#000000',
     marginBottom: 6,
-    marginLeft: 4,
+    marginLeft: 6,
     fontWeight: '500',
   },
   inputWrapper: {
@@ -130,16 +180,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#d1d5db',
-    borderRadius: 25, // Margini rotunjite exact ca în poză
+    borderRadius: 25,
     paddingHorizontal: 15,
-    height: 55,
+    height: 52,
   },
   icon: {
     marginRight: 12,
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: '#333333',
+  },
+  submitButton: {
+    backgroundColor: '#00cbb2',
+    width: '100%',
+    maxWidth: 300,
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  submitButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
