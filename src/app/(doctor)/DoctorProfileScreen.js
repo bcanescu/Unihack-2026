@@ -1,5 +1,5 @@
 import React from 'react';
-import {StyleSHeet, Text, View, Image, TouchableOpacity, ScrollView} from 'react-native';
+import {StyleSheet, Text, View, Image, TouchableOpacity, ScrollView} from 'react-native';
 import {Calendar, LocaleConfig} from 'react-native-calendars';
 
 LocaleConfig.locales['ro'] = {
