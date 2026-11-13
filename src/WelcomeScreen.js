@@ -19,7 +19,7 @@ export default function WelcomeScreen()
                 <Text style={styles.loginText}>Login</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={Styles.loginButton} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.loginButton} activeOpacity={0.8}>
                 <Text style={styles.signUpTExt}>Sign Up</Text>
             </TouchableOpacity>
         </View>
