@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Valorile vin din fișierul .env (vezi .env.example).
@@ -22,6 +23,7 @@ export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseCon
 
 let auth = null;
 let db = null;
+let storage = null;
 
 if (isFirebaseConfigured) {
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -37,6 +39,12 @@ if (isFirebaseConfigured) {
     }
   }
   db = getFirestore(app);
+  storage = getStorage(app);
 }
 
-export { auth, db };
+// Încărcarea de PDF-uri cere Firebase Storage, disponibil doar pe planul Blaze.
+// Activează cu EXPO_PUBLIC_ENABLE_PDF_UPLOAD=true în .env după ce ai creat bucket-ul.
+export const pdfUploadEnabled =
+  !isFirebaseConfigured || process.env.EXPO_PUBLIC_ENABLE_PDF_UPLOAD === 'true';
+
+export { auth, db, storage };
