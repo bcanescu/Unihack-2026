@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function userDoc() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data; }
+    function isVerifiedDoctor() {
+      return signedIn() && userDoc().role == 'doctor' && userDoc().status == 'verified';
+    }
+
+    // users/{uid}: { role: "patient" | "doctor", name, status, createdAt }
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      // La înregistrare, oricine își poate crea DOAR profil de pacient (fără câmpul status).
+      allow create: if isOwner(uid)
+        && request.resource.data.role == 'patient'
+        && request.resource.data.keys().hasOnly(['role', 'name', 'createdAt']);
+
+      // Rolul și statusul nu pot fi modificate din aplicație.
+      // Conturile de medic se creează/aprobă din consola Firebase.
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']);
+
+      allow delete: if false;
+    }
+
+    // patients/{uid}: { name, cnpHash, birthDate, sex, createdAt }
+    match /patients/{uid} {
+      allow read: if isOwner(uid);   // accesul medicilor se adaugă odată cu cererile de acces
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'cnpHash', 'birthDate', 'sex', 'createdAt']);
+      // CNP-ul (hash-ul lui) nu se mai poate schimba după înregistrare.
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cnpHash', 'birthDate', 'sex']);
+      allow delete: if false;
+    }
+
+    // cnpIndex/{cnpHash}: { patientUid }
+    match /cnpIndex/{hash} {
+      // Medicul verificat poate căuta UN anumit hash (get), dar nu poate lista toată colecția.
+      allow get: if isVerifiedDoctor() || (signedIn() && resource.data.patientUid == request.auth.uid);
+      allow list: if false;
+
+      // „create” se aplică doar dacă documentul NU există, deci un CNP nu poate fi revendicat de două ori.
+      // Hash-ul trebuie să fie exact cel din profilul pacientului scris în același batch.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['patientUid'])
+        && request.resource.data.patientUid == request.auth.uid
+        && getAfter(/databases/$(db)/documents/patients/$(request.auth.uid)).data.cnpHash == hash;
+
+      allow update, delete: if false;
+    }
+  }
+}

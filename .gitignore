@@ -40,5 +40,5 @@ yarn-error.*
 /ios
 /android
 
-#test pentru calculatorul lui sebi
-Test.js
+# Firebase config
+.env
