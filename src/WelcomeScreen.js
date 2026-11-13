@@ -4,7 +4,7 @@ import {StyleSheet, Text, View, Image, TouchableOpacity } from 'react-native';
 export default function WelcomeScreen()
 {
     return (
-        <View style={StyleSheet.container}>
+        <View style={styles.container}>
             <Image source={require('../assets/MedlyImage.png')}style={styles.logo} resizeMode="contain" />
 
             <View style={styles.logoPlaceholder}/>
