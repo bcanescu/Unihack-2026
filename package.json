@@ -25,11 +25,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-<<<<<<< Updated upstream
-    "lint": "expo lint"
-=======
+    "lint": "expo lint",
     "test": "jest"
->>>>>>> Stashed changes
   },
   "private": true,
   "devDependencies": {
