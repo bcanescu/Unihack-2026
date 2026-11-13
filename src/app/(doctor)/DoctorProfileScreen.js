@@ -19,7 +19,7 @@ export default function DoctorProfileScreen()
         <ScrollView contentContainerStyle="{styles.scrollContent}" style="{styles.container">
             <View style="{styles.headerRow}">
                 <View style="{styles.imagePlacegholder}">
-                    {/* <Image soruce="{require('../assets/doctor.png')}" style = style="{styles.doctorImage}"/> */}
+                    <Image soruce="{require('../../../assets/favicon.png')}" style="{styles.doctorImage}"/>
                 </View>
                 <View style="{styles.headerInfo}">
                     <Text style="{styles.doctorName}">Dr Banca Sebastian</Text>
