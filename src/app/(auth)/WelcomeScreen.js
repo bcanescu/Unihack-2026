@@ -5,7 +5,7 @@ export default function WelcomeScreen()
 {
     return (
         <View style={styles.container}>
-            <Image source={require('../assets/MedlyImage.png')}style={styles.logo} resizeMode="contain" />
+            <Image source={require('../../../assets/MedlyImage.png')}style={styles.logo} resizeMode="contain" />
 
 
             <Text style={styles.title}>Let's get started!</Text>
