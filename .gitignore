@@ -42,3 +42,9 @@ yarn-error.*
 
 # Firebase config
 .env
+
+#Alt fisier de la sebi care vrea sa fie ignorat
+mainDinPackage.txt
+
+#Testul lui sebi pentru gitignore
+Test.js
