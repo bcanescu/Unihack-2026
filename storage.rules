@@ -1,0 +1,28 @@
+rules_version = '2';
+// Reguli pentru Firebase Storage (doar dacă folosești atașarea de PDF la analize – planul Blaze).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /patients/{pid}/labs/{fileName} {
+      function userDoc() {
+        return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      }
+      function isVerifiedDoctor() {
+        return userDoc().role == 'doctor' && userDoc().status == 'verified';
+      }
+      function hasActiveLink() {
+        let p = /databases/(default)/documents/careLinks/$(request.auth.uid + '_' + pid);
+        return firestore.exists(p) && firestore.get(p).data.status == 'active';
+      }
+
+      // Pacientul își vede buletinele; medicul doar cu acces activ.
+      allow read: if request.auth != null
+        && (request.auth.uid == pid || (isVerifiedDoctor() && hasActiveLink()));
+
+      // Doar medicul cu acces activ încarcă, doar PDF, maximum 10 MB. Fără suprascriere / ștergere.
+      allow create: if request.auth != null && isVerifiedDoctor() && hasActiveLink()
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow update, delete: if false;
+    }
+  }
+}

@@ -10,13 +10,21 @@ import {
 import { doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '../lib/firebase';
 import { validateCnp, hashCnp } from '../lib/cnp';
+import { demoStore } from '../lib/demoStore';
 
 const AuthContext = createContext(null);
 
 // Conturi folosite doar în modul demo (fără Firebase configurat).
 export const DEMO_ACCOUNTS = [
   { email: 'pacient@demo.ro', password: 'demo1234', role: 'patient', name: 'Ion Popescu' },
-  { email: 'medic@demo.ro', password: 'demo1234', role: 'doctor', name: 'Dr. Ana Ionescu' },
+  {
+    email: 'medic@demo.ro',
+    password: 'demo1234',
+    role: 'doctor',
+    name: 'Dr. Ana Ionescu',
+    specialty: 'Cardiologie',
+    hospital: 'Institutul de Boli Cardiovasculare Timișoara',
+  },
 ];
 
 /**
@@ -28,7 +36,14 @@ async function loadProfile(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
   if (!snap.exists()) return null;
   const data = snap.data();
-  return { uid, role: data.role, name: data.name, status: data.status };
+  return {
+    uid,
+    role: data.role,
+    name: data.name,
+    status: data.status,
+    specialty: data.specialty,
+    hospital: data.hospital,
+  };
 }
 
 export function AuthProvider({ children }) {
@@ -74,7 +89,14 @@ export function AuthProvider({ children }) {
     if (!isFirebaseConfigured) {
       const demo = DEMO_ACCOUNTS.find((a) => a.email === cleanEmail && a.password === password);
       if (!demo) throw { code: 'auth/invalid-credential' };
-      setUser({ uid: demo.email, email: demo.email, role: demo.role, name: demo.name });
+      setUser({
+        uid: demo.email,
+        email: demo.email,
+        role: demo.role,
+        name: demo.name,
+        specialty: demo.specialty,
+        hospital: demo.hospital,
+      });
       return;
     }
 
@@ -106,6 +128,12 @@ export function AuthProvider({ children }) {
     if (!cnpInfo.valid) throw { code: 'app/invalid-cnp', message: cnpInfo.error };
 
     if (!isFirebaseConfigured) {
+      const added = demoStore.addPatient(
+        cleanEmail,
+        { name: cleanName, birthDate: cnpInfo.birthDate, sex: cnpInfo.sex },
+        cnp.trim()
+      );
+      if (!added) throw { code: 'app/cnp-taken' };
       setUser({ uid: cleanEmail, email: cleanEmail, role: 'patient', name: cleanName });
       return;
     }

@@ -8,6 +8,13 @@ service cloud.firestore {
     function isVerifiedDoctor() {
       return signedIn() && userDoc().role == 'doctor' && userDoc().status == 'verified';
     }
+    function linkPath(patientUid) {
+      return /databases/$(db)/documents/careLinks/$(request.auth.uid + '_' + patientUid);
+    }
+    // Medicul curent are acces activ (acceptat de pacient) la acest pacient?
+    function hasActiveLink(patientUid) {
+      return exists(linkPath(patientUid)) && get(linkPath(patientUid)).data.status == 'active';
+    }
 
     // users/{uid}: { role: "patient" | "doctor", name, status, createdAt }
     match /users/{uid} {
@@ -28,13 +35,66 @@ service cloud.firestore {
 
     // patients/{uid}: { name, cnpHash, birthDate, sex, createdAt }
     match /patients/{uid} {
-      allow read: if isOwner(uid);   // accesul medicilor se adaugă odată cu cererile de acces
+      // Pacientul își vede profilul; medicul doar dacă pacientul i-a acceptat cererea.
+      allow read: if isOwner(uid) || (isVerifiedDoctor() && hasActiveLink(uid));
       allow create: if isOwner(uid)
         && request.resource.data.keys().hasOnly(['name', 'cnpHash', 'birthDate', 'sex', 'createdAt']);
       // CNP-ul (hash-ul lui) nu se mai poate schimba după înregistrare.
       allow update: if isOwner(uid)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cnpHash', 'birthDate', 'sex']);
       allow delete: if false;
+    }
+
+    // patients/{uid}/medications/{medId} – plan de tratament
+    match /patients/{uid}/medications/{medId} {
+      function validMed(d) {
+        return d.keys().hasOnly(['name', 'dose', 'times', 'instructions', 'startDate', 'endDate', 'active',
+                                 'addedBy', 'addedByName', 'createdAt', 'stoppedAt'])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 100
+          && d.dose is string && d.dose.size() <= 100
+          && d.times is list && d.times.size() > 0 && d.times.size() <= 6
+          && d.instructions is string && d.instructions.size() <= 300;
+      }
+      // Pacientul își vede tratamentul; medicul doar cu acces activ.
+      allow read: if isOwner(uid) || (isVerifiedDoctor() && hasActiveLink(uid));
+      // Doar un medic cu acces activ adaugă medicamente, semnate cu numele lui.
+      allow create: if isVerifiedDoctor() && hasActiveLink(uid)
+        && validMed(request.resource.data)
+        && request.resource.data.addedBy == request.auth.uid
+        && request.resource.data.addedByName == userDoc().name
+        && request.resource.data.active == true;
+      // Medicul își poate opri doar tratamentele adăugate de el. Nimic nu se șterge (istoric).
+      allow update: if isVerifiedDoctor() && hasActiveLink(uid)
+        && resource.data.addedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'endDate', 'stoppedAt'])
+        && request.resource.data.active == false;
+      allow delete: if false;
+    }
+
+    // patients/{uid}/intakes/{intakeId} – dozele bifate ca „Luat” de pacient
+    match /patients/{uid}/intakes/{intakeId} {
+      allow read: if isOwner(uid) || (isVerifiedDoctor() && hasActiveLink(uid));
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['medId', 'date', 'time', 'takenAt'])
+        && exists(/databases/$(db)/documents/patients/$(uid)/medications/$(request.resource.data.medId));
+      allow delete: if isOwner(uid);   // debifare
+      allow update: if false;
+    }
+
+    // patients/{uid}/labs/{labId} – buletine de analize (adăugate de medic)
+    match /patients/{uid}/labs/{labId} {
+      allow read: if isOwner(uid) || (isVerifiedDoctor() && hasActiveLink(uid));
+      allow create: if isVerifiedDoctor() && hasActiveLink(uid)
+        && request.resource.data.keys().hasOnly(
+             ['title', 'labName', 'date', 'results', 'note', 'file', 'addedBy', 'addedByName', 'createdAt'])
+        && request.resource.data.title is string && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.results is list && request.resource.data.results.size() <= 40
+        && request.resource.data.note is string && request.resource.data.note.size() <= 1000
+        && request.resource.data.addedBy == request.auth.uid
+        && request.resource.data.addedByName == userDoc().name;
+      // Rezultatele nu se modifică și nu se șterg (trasabilitate).
+      allow update, delete: if false;
     }
 
     // cnpIndex/{cnpHash}: { patientUid }
@@ -51,6 +111,116 @@ service cloud.firestore {
         && getAfter(/databases/$(db)/documents/patients/$(request.auth.uid)).data.cnpHash == hash;
 
       allow update, delete: if false;
+    }
+
+    // careLinks/{doctorUid_patientUid}:
+    //   { doctorUid, patientUid, doctorName, doctorSpecialty, label, status, createdAt, respondedAt }
+    // status: pending → active | declined;  active → revoked;  declined | revoked → pending (cerere nouă)
+    match /careLinks/{linkId} {
+      function isDoctorOfLink() { return signedIn() && resource.data.doctorUid == request.auth.uid; }
+      function isPatientOfLink() { return signedIn() && resource.data.patientUid == request.auth.uid; }
+      function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+      // get după ID (funcționează și când documentul nu există încă) – doar cei doi participanți.
+      allow get: if signedIn()
+        && (linkId.split('_')[0] == request.auth.uid || linkId.split('_')[1] == request.auth.uid);
+      // Interogări: fiecare își vede doar legăturile proprii.
+      allow list: if isDoctorOfLink() || isPatientOfLink();
+
+      // Doar un medic verificat creează cereri, în nume propriu, pentru un pacient existent.
+      allow create: if isVerifiedDoctor()
+        && request.resource.data.keys().hasOnly(
+             ['doctorUid', 'patientUid', 'doctorName', 'doctorSpecialty', 'label', 'status', 'createdAt', 'respondedAt'])
+        && request.resource.data.doctorUid == request.auth.uid
+        && linkId == request.auth.uid + '_' + request.resource.data.patientUid
+        && request.resource.data.doctorName == userDoc().name
+        && request.resource.data.status == 'pending'
+        && exists(/databases/$(db)/documents/patients/$(request.resource.data.patientUid));
+
+      allow update: if
+        // Medicul retrimite cererea după un refuz sau o revocare.
+        (isVerifiedDoctor() && isDoctorOfLink()
+          && resource.data.status in ['declined', 'revoked']
+          && request.resource.data.status == 'pending'
+          && changed().hasOnly(['status', 'label', 'createdAt', 'respondedAt']))
+        ||
+        // Pacientul răspunde la cerere sau retrage accesul. Doar el poate da acces.
+        (isPatientOfLink()
+          && changed().hasOnly(['status', 'respondedAt'])
+          && ((resource.data.status == 'pending' && request.resource.data.status in ['active', 'declined'])
+              || (resource.data.status == 'active' && request.resource.data.status == 'revoked')));
+
+      allow delete: if false;
+    }
+
+    // doctors/{uid}: { name, specialty, hospital, verified } – director public de medici.
+    // Se completează de administrator din consolă; aplicația doar citește.
+    match /doctors/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // ── Programări ────────────────────────────────────────────
+    // Pacientul are acces activ dat acestui medic? (doar atunci se poate programa la el)
+    function patientLinkPath(doctorUid) {
+      return /databases/$(db)/documents/careLinks/$(doctorUid + '_' + request.auth.uid);
+    }
+    function patientLinkedTo(doctorUid) {
+      return exists(patientLinkPath(doctorUid)) && get(patientLinkPath(doctorUid)).data.status == 'active';
+    }
+    // Medic listat public în director (poate primi programări de la orice pacient).
+    function doctorListed(doctorUid) {
+      return exists(/databases/$(db)/documents/doctors/$(doctorUid))
+        && get(/databases/$(db)/documents/doctors/$(doctorUid)).data.verified == true;
+    }
+    function expectedSlotId(d) {
+      return d.doctorUid + '_' + d.date + '_' + d.time.replace(':', '');
+    }
+
+    // appointments/{id}
+    match /appointments/{id} {
+      allow read: if signedIn()
+        && (resource.data.patientUid == request.auth.uid || resource.data.doctorUid == request.auth.uid);
+
+      // Pacientul se programează în nume propriu, la un medic din director sau căruia i-a dat acces,
+      // și doar dacă în același batch ocupă slotul (busySlots) – asta previne dubla rezervare.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['doctorUid', 'patientUid', 'doctorName', 'doctorSpecialty', 'hospital', 'patientName', 'date', 'time',
+              'reason', 'slotId', 'status', 'createdAt'])
+        && request.resource.data.patientUid == request.auth.uid
+        && request.resource.data.status == 'booked'
+        && (patientLinkedTo(request.resource.data.doctorUid) || doctorListed(request.resource.data.doctorUid))
+        && request.resource.data.slotId == expectedSlotId(request.resource.data)
+        && getAfter(/databases/$(db)/documents/busySlots/$(request.resource.data.slotId)).data.appointmentId == id;
+
+      // Oricare dintre cei doi poate anula. Programarea rămâne în istoric.
+      allow update: if signedIn()
+        && (resource.data.patientUid == request.auth.uid || resource.data.doctorUid == request.auth.uid)
+        && resource.data.status == 'booked'
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledBy', 'cancelledAt']);
+
+      allow delete: if false;
+    }
+
+    // busySlots/{doctorUid_data_HHMM} – doar „ora X e ocupată”, fără date despre pacient
+    match /busySlots/{slotId} {
+      allow read: if signedIn();
+
+      // „create” eșuează dacă slotul există deja → nimeni nu poate lua o oră ocupată.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['doctorUid', 'date', 'time', 'appointmentId'])
+        && slotId == expectedSlotId(request.resource.data)
+        && getAfter(/databases/$(db)/documents/appointments/$(request.resource.data.appointmentId)).data.patientUid == request.auth.uid
+        && getAfter(/databases/$(db)/documents/appointments/$(request.resource.data.appointmentId)).data.slotId == slotId;
+
+      // Se eliberează la anulare, de pacientul programării sau de medic.
+      allow delete: if signedIn()
+        && (resource.data.doctorUid == request.auth.uid
+            || get(/databases/$(db)/documents/appointments/$(resource.data.appointmentId)).data.patientUid == request.auth.uid);
+
+      allow update: if false;
     }
   }
 }
