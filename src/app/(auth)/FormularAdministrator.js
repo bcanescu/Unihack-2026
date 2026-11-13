@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function AdminFormScreen() {
-  const [name1, setName1] = useState('');
-  const [name2, setName2] = useState('');
-  const [name3, setName3] = useState('');
+export default function FormularAdministrator() {
+  const [nume, setNume] = useState('');
+  const [cnp, setCnp] = useState('');
+  const [email, setEmail] = useState('');
+  const [telefon, setTelefon] = useState('');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -17,44 +18,70 @@ export default function AdminFormScreen() {
         <Text style={styles.headerTitle}>Formular Administrator</Text>
       </View>
 
-      {/* Corpul formularului */}
-      <View style={styles.formContainer}>
-        {/* Primul input (cel evidențiat/selectat din poză) */}
-        <View style={[styles.inputWrapper, styles.inputActive]}>
-          <Ionicons name="person-outline" size={20} color="#7b8292" style={styles.icon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your name"
-            placeholderTextColor="#9ba1b0"
-            value={name1}
-            onChangeText={setName1}
-          />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Câmpul 1: Nume+Prenume */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Nume+Prenume</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="person-outline" size={20} color="#7b8292" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your name"
+              placeholderTextColor="#9ba1b0"
+              value={nume}
+              onChangeText={setNume}
+            />
+          </View>
         </View>
 
-        {/* Al doilea input */}
-        <View style={styles.inputWrapper}>
-          <Ionicons name="person-outline" size={20} color="#7b8292" style={styles.icon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your name"
-            placeholderTextColor="#9ba1b0"
-            value={name2}
-            onChangeText={setName2}
-          />
+        {/* Câmpul 2: CNP */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>CNP</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="card-outline" size={20} color="#7b8292" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your CNP"
+              placeholderTextColor="#9ba1b0"
+              value={cnp}
+              onChangeText={setCnp}
+              keyboardType="numeric"
+            />
+          </View>
         </View>
 
-        {/* Al treilea input */}
-        <View style={styles.inputWrapper}>
-          <Ionicons name="person-outline" size={20} color="#7b8292" style={styles.icon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your name"
-            placeholderTextColor="#9ba1b0"
-            value={name3}
-            onChangeText={setName3}
-          />
+        {/* Câmpul 3: Email */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="mail-outline" size={20} color="#7b8292" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email"
+              placeholderTextColor="#9ba1b0"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+            />
+          </View>
         </View>
-      </View>
+
+        {/* Câmpul 4: Telefon */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Număr de telefon</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="call-outline" size={20} color="#7b8292" style={styles.icon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your phone"
+              placeholderTextColor="#9ba1b0"
+              value={telefon}
+              onChangeText={setTelefon}
+              keyboardType="phone-pad"
+            />
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -80,29 +107,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000000',
   },
-  formContainer: {
+  scrollContent: {
+    alignItems: 'center', // Centrează tot conținutul pe mijloc pe orizontală
+    paddingVertical: 30,
     paddingHorizontal: 20,
-    marginTop: 35,
+  },
+  inputContainer: {
+    width: '100%',
+    maxWidth: 400, // Limitează lățimea pe ecrane mari (web/tablets) ca să arate perfect centrat
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 13,
+    color: '#000000',
+    marginBottom: 6,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e2e6eb',
-    borderRadius: 16,
+    borderColor: '#d1d5db',
+    borderRadius: 25, // Margini rotunjite exact ca în poză
     paddingHorizontal: 15,
     height: 55,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  inputActive: {
-    borderColor: '#5c6480', // Chenarul mai închis la culoare exact ca în selecția din poză
-    borderWidth: 1.5,
   },
   icon: {
     marginRight: 12,
