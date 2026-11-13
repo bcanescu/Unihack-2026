@@ -7,7 +7,6 @@ export default function WelcomeScreen()
         <View style={styles.container}>
             <Image source={require('../assets/MedlyImage.png')}style={styles.logo} resizeMode="contain" />
 
-            <View style={styles.logoPlaceholder}/>
 
             <Text style={styles.title}>Let's get started!</Text>
 
@@ -33,13 +32,6 @@ const styles = StyleSheet.create({
         alignItems:'center',
         justifyContent:'center',
         paddingHorizontal:30,
-    },
-    logoPlaceholder:{
-        width:100,
-        height:100,
-        backgroundColor:'#00cbb2',
-        borderRadius:20,
-        marginBottom:20,
     },
     logo:{
         width:120,
