@@ -17,6 +17,7 @@ import { getDoctors, uniqueSorted } from "../../lib/doctors";
 import { subscribeRatings } from "../../lib/doctorProfile";
 import { RatingInline } from "../../components/Stars";
 import DoctorPreview from "../../components/DoctorPreview";
+import HospitalRatingCard from "../../components/HospitalRatingCard";
 import {
   subscribeBusy,
   bookAppointment,
@@ -356,6 +357,7 @@ export default function BookAppointment() {
                     />
                   ))}
                 </ScrollView>
+                {hospital !== ALL && <HospitalRatingCard hospital={hospital} />}
                 <Text style={styles.subLabel}>Specializare</Text>
                 <ScrollView
                   horizontal

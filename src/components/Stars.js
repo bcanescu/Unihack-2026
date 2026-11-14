@@ -36,10 +36,10 @@ export function RatingInline({ avg, count, size = 14 }) {
 const LABELS = ['', 'Foarte slab', 'Slab', 'Acceptabil', 'Bun', 'Excelent'];
 
 /** Selector de stele 1–5, mare, ușor de atins. */
-export function StarPicker({ value, onChange }) {
+export function StarPicker({ value, onChange, size = 44, showLabel = true, label }) {
   return (
     <View style={{ alignItems: 'center', gap: 6 }}>
-      <View style={[styles.row, { gap: 8 }]} accessibilityRole="radiogroup">
+      <View style={[styles.row, { gap: size > 30 ? 8 : 4 }]} accessibilityRole="radiogroup" accessibilityLabel={label}>
         {[1, 2, 3, 4, 5].map((i) => (
           <Pressable
             key={i}
@@ -47,13 +47,13 @@ export function StarPicker({ value, onChange }) {
             hitSlop={6}
             accessibilityRole="radio"
             accessibilityState={{ selected: value === i }}
-            accessibilityLabel={`${i} ${i === 1 ? 'stea' : 'stele'}`}
+            accessibilityLabel={`${label ? `${label}: ` : ''}${i} ${i === 1 ? 'stea' : 'stele'}`}
           >
-            <Ionicons name={value >= i ? 'star' : 'star-outline'} size={44} color={GOLD} />
+            <Ionicons name={value >= i ? 'star' : 'star-outline'} size={size} color={GOLD} />
           </Pressable>
         ))}
       </View>
-      <Text style={styles.pickLabel}>{value ? LABELS[value] : 'Atinge o stea'}</Text>
+      {showLabel && <Text style={styles.pickLabel}>{value ? LABELS[value] : 'Atinge o stea'}</Text>}
     </View>
   );
 }

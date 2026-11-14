@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { subscribeDoctorPublic, subscribeDoctorReviews, ratingSummary, formatReviewDate } from '../lib/doctorProfile';
 import { Stars } from './Stars';
+import HospitalRatingCard from './HospitalRatingCard';
 import { colors, spacing, radius, font } from '../constants/theme';
 
 export default function DoctorPreview({ uid }) {
@@ -75,6 +76,8 @@ export default function DoctorPreview({ uid }) {
       ) : (
         <Text style={styles.empty}>Nicio recenzie încă.</Text>
       )}
+
+      {!!doctor.hospital && <HospitalRatingCard hospital={doctor.hospital} compact />}
 
       <Pressable
         onPress={() => router.push({ pathname: `/doctor/${uid}`, params: { fromBooking: '1' } })}

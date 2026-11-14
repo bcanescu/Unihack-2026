@@ -11,6 +11,7 @@ import { submitReview, isAppointmentFinished, authorNameFrom, MIN_COMMENT, MAX_C
 import TopBar from '../../../components/TopBar';
 import PrimaryButton from '../../../components/PrimaryButton';
 import { StarPicker } from '../../../components/Stars';
+import { CRITERIA, ISSUES, MAX_HOSPITAL_COMMENT, submitHospitalReview } from '../../../lib/hospitalReviews';
 import { Avatar, EmptyState } from '../../../components/ui';
 import { colors, spacing, radius, font } from '../../../constants/theme';
 
@@ -25,6 +26,12 @@ export default function ReviewScreen() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  // Evaluarea spitalului (opțională)
+  const [hRatings, setHRatings] = useState({ cleanliness: 0, staff: 0, facilities: 0 });
+  const [issues, setIssues] = useState([]);
+  const [hComment, setHComment] = useState('');
+  const hStarted = Object.values(hRatings).some(Boolean) || issues.length > 0 || hComment.trim().length > 0;
+  const toggleIssue = (i) => setIssues((cur) => (cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i]));
 
   useEffect(
     () => subscribePatientAppointments(user.uid, (list) => setAppt((cur) => (cur === undefined || cur ? list.find((a) => a.id === apptId) ?? null : cur))),
@@ -35,9 +42,16 @@ export default function ReviewScreen() {
     setError('');
     if (!rating) return setError('Alege o notă de la 1 la 5 stele.');
     if (comment.trim().length < MIN_COMMENT) return setError('Scrie în câteva cuvinte de ce ai dat această notă.');
+    if (hStarted && Object.values(hRatings).some((v) => !v))
+      return setError('Pentru evaluarea spitalului, dă o notă la toate cele trei criterii (sau lasă secțiunea goală).');
     setSaving(true);
     try {
       await submitReview(user, appt, rating, comment);
+      if (hStarted && appt.hospital) {
+        await submitHospitalReview(user, appt, hRatings, issues, hComment).catch((e) =>
+          console.warn('[recenzie spital]', e?.code, e?.message)
+        );
+      }
       setDone(true);
     } catch (e) {
       setError(e?.code === 'already-reviewed' ? 'Ai lăsat deja o recenzie pentru această consultație.' : 'Nu am putut trimite recenzia. Încearcă din nou.');
@@ -73,7 +87,7 @@ export default function ReviewScreen() {
             <Ionicons name="heart" size={34} color={colors.success} />
           </View>
           <Text style={styles.title}>Mulțumim!</Text>
-          <Text style={styles.text}>Recenzia ta îi ajută pe ceilalți pacienți să aleagă medicul potrivit.</Text>
+          <Text style={styles.text}>Recenzia ta îi ajută pe ceilalți pacienți să aleagă medicul și spitalul potrivit.</Text>
           <View style={{ alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.md }}>
             <PrimaryButton title="Vezi profilul medicului" onPress={() => router.replace(`/doctor/${appt.doctorUid}`)} />
             <PrimaryButton title="Înapoi la programări" variant="outline" onPress={() => router.replace('/appointments')} />
@@ -136,6 +150,60 @@ export default function ReviewScreen() {
             <Text style={styles.counter}>{comment.length}/{MAX_COMMENT}</Text>
           </View>
 
+          {!!appt.hospital && (
+            <View style={styles.hospitalBox}>
+              <View style={{ gap: 2 }}>
+                <Text style={styles.hospitalTitle}>Cum a fost la spital? (opțional)</Text>
+                <Text style={styles.meta}>{appt.hospital}</Text>
+              </View>
+              {CRITERIA.map((c) => (
+                <View key={c.key} style={styles.criterion}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.criterionLabel}>{c.label}</Text>
+                    {!!c.hint && <Text style={styles.criterionHint}>{c.hint}</Text>}
+                  </View>
+                  <StarPicker
+                    value={hRatings[c.key]}
+                    onChange={(v) => {
+                      setHRatings((cur) => ({ ...cur, [c.key]: v }));
+                      setError('');
+                    }}
+                    size={28}
+                    showLabel={false}
+                    label={c.label}
+                  />
+                </View>
+              ))}
+              <Text style={styles.label}>Ai observat probleme?</Text>
+              <View style={styles.quick}>
+                {ISSUES.map((i) => {
+                  const on = issues.includes(i);
+                  return (
+                    <Text
+                      key={i}
+                      onPress={() => toggleIssue(i)}
+                      style={[styles.issueChip, on && styles.issueChipOn]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on }}
+                    >
+                      {on ? '✓ ' : ''}
+                      {i}
+                    </Text>
+                  );
+                })}
+              </View>
+              <TextInput
+                style={[styles.input, { minHeight: 70 }]}
+                value={hComment}
+                onChangeText={(t) => setHComment(t.slice(0, MAX_HOSPITAL_COMMENT))}
+                placeholder="Alte observații despre spital (opțional)"
+                placeholderTextColor="#94A3B8"
+                multiline
+                accessibilityLabel="Comentariu despre spital"
+              />
+            </View>
+          )}
+
           <View style={styles.note}>
             <Ionicons name="eye-outline" size={16} color={colors.textMuted} />
             <Text style={styles.noteText}>
@@ -189,6 +257,23 @@ const styles = StyleSheet.create({
     outlineStyle: 'none',
   },
   counter: { alignSelf: 'flex-end', fontSize: font.small - 2, color: colors.textMuted },
+  hospitalBox: { gap: spacing.md, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#FAFBFC' },
+  hospitalTitle: { fontSize: font.body + 1, fontWeight: '800', color: colors.text },
+  criterion: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  criterionLabel: { fontSize: font.body - 1, fontWeight: '700', color: colors.text },
+  criterionHint: { fontSize: font.small - 2, color: colors.textMuted },
+  issueChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    color: colors.text,
+    fontWeight: '600',
+    fontSize: font.small,
+    overflow: 'hidden',
+  },
+  issueChipOn: { borderColor: colors.warning, backgroundColor: colors.warningSoft, color: colors.warning },
   note: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surface },
   noteText: { flex: 1, fontSize: font.small - 1, color: colors.textMuted, lineHeight: 18 },
   err: { color: colors.error, fontSize: font.small + 1 },

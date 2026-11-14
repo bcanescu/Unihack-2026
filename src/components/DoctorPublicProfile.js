@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { subscribeDoctorPublic, subscribeDoctorReviews, ratingSummary, formatReviewDate } from '../lib/doctorProfile';
 import { Stars } from './Stars';
+import HospitalRatingCard from './HospitalRatingCard';
 import { initials, Card, EmptyState } from './ui';
 import { colors, spacing, radius, font } from '../constants/theme';
 
@@ -100,6 +101,12 @@ export default function DoctorPublicProfile({ uid, footer }) {
         </Section>
       )}
       {!hasAbout && <Text style={styles.empty}>Medicul nu și-a completat încă profilul.</Text>}
+
+      {!!doctor.hospital && (
+        <Section icon="business-outline" title="Spitalul">
+          <HospitalRatingCard hospital={doctor.hospital} />
+        </Section>
+      )}
 
       {/* Recenzii */}
       <Section icon="chatbubbles-outline" title={`Recenzii pacienți${count ? ` (${count})` : ''}`}>

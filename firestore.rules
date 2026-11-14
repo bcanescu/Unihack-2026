@@ -237,6 +237,32 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // hospitalReviews/{appointmentId}: { hospital, patientUid, authorName, cleanliness, staff, facilities, issues, comment, createdAt }
+    // Evaluarea spitalului după o consultație: doar pacientul programării, o singură dată, pentru spitalul programării.
+    match /hospitalReviews/{apptId} {
+      function happt() { return get(/databases/$(db)/documents/appointments/$(apptId)).data; }
+      function validScore(v) { return v is int && v >= 1 && v <= 5; }
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['hospital', 'patientUid', 'authorName', 'cleanliness', 'staff', 'facilities', 'issues', 'comment', 'createdAt'])
+        && request.resource.data.patientUid == request.auth.uid
+        && validScore(request.resource.data.cleanliness)
+        && validScore(request.resource.data.staff)
+        && validScore(request.resource.data.facilities)
+        && request.resource.data.issues is list && request.resource.data.issues.size() <= 8
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 300
+        && request.resource.data.authorName is string && request.resource.data.authorName.size() <= 40
+        && happt().patientUid == request.auth.uid
+        && happt().status == 'booked'
+        && happt().hospital == request.resource.data.hospital
+        && happt().date <= string(request.time.year()) + '-'
+             + (request.time.month() < 10 ? '0' : '') + string(request.time.month()) + '-'
+             + (request.time.day() < 10 ? '0' : '') + string(request.time.day());
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     // ── Programări ────────────────────────────────────────────
     // Pacientul are acces activ dat acestui medic? (doar atunci se poate programa la el)
     function patientLinkPath(doctorUid) {
