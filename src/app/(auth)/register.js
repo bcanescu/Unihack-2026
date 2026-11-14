@@ -198,7 +198,7 @@ export default function RegisterScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Ai deja cont? </Text>
-            <Pressable onPress={() => router.replace('/login')} hitSlop={10} accessibilityRole="link">
+            <Pressable onPress={() => router.replace('/login')} hitSlop={10} accessibilityRole="button">
               <Text style={styles.link}>Autentificare</Text>
             </Pressable>
           </View>

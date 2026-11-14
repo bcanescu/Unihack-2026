@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 import { useAuth } from "../context/AuthContext";
 import { getPatientSummary, ageFrom } from "../lib/careLinks";
@@ -11,6 +12,14 @@ import { subscribeMedications } from "../lib/medications";
 import { SCHEDULE_TEXT, SCHEDULE } from "../lib/appointments";
 import { initials } from "./ui";
 import RemindersCard from "./RemindersCard";
+import PrimaryButton from "./PrimaryButton";
+import { addSampleIntakes, addDays, dateKey } from "../lib/medications";
+import { bookAppointment } from "../lib/appointments";
+import { getDoctors } from "../lib/doctors";
+import { isFirebaseConfigured } from "../lib/firebase";
+
+// Unelte pentru prezentare: în modul demo mereu, cu Firebase doar dacă EXPO_PUBLIC_DEMO_TOOLS=true.
+const DEMO_TOOLS = !isFirebaseConfigured || process.env.EXPO_PUBLIC_DEMO_TOOLS === "true";
 import { colors, spacing, radius, font } from "../constants/theme";
 
 const formatBirth = (d) =>
@@ -77,6 +86,45 @@ export default function ProfileScreen() {
   const [details, setDetails] = useState(null);
   const [meds, setMeds] = useState([]);
   const [open, setOpen] = useState(null);
+  const [demoMsg, setDemoMsg] = useState("");
+  const [demoBusy, setDemoBusy] = useState(false);
+
+  async function simulateFinishedAppointment() {
+    setDemoBusy(true);
+    setDemoMsg("");
+    try {
+      const list = await getDoctors();
+      const d = list[0];
+      if (!d) throw new Error("no doctors");
+      // Ieri, la o oră aleasă aleatoriu, ca să nu se suprapună cu o simulare anterioară.
+      const hour = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30"][Math.floor(Math.random() * 8)];
+      await bookAppointment(
+        user,
+        { doctorUid: d.uid, doctorName: d.name, doctorSpecialty: d.specialty, hospital: d.hospital },
+        addDays(dateKey(), -1),
+        hour,
+        "Consult"
+      );
+      setDemoMsg(`Consultație de ieri cu ${d.name} adăugată – vezi bannerul de recenzie pe Acasă.`);
+    } catch {
+      setDemoMsg("Nu am putut simula consultația (ora poate fi ocupată – mai încearcă o dată).");
+    } finally {
+      setDemoBusy(false);
+    }
+  }
+
+  async function generateDemoIntakes() {
+    setDemoBusy(true);
+    setDemoMsg("");
+    try {
+      const n = await addSampleIntakes(user.uid, meds, 14);
+      setDemoMsg(n > 0 ? `Am adăugat ${n} doze în istoric.` : "Nu există doze în ultimele 14 zile (cere medicului un tratament început în trecut).");
+    } catch {
+      setDemoMsg("Nu am putut genera istoricul.");
+    } finally {
+      setDemoBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (isDoctor || isAdmin) return;
@@ -130,6 +178,7 @@ export default function ProfileScreen() {
             </MenuItem>
           ) : isDoctor ? (
             <>
+              <MenuItem icon="star" title="Profil public și recenzii" onPress={() => router.push("/public-profile")} />
               <MenuItem
                 icon="briefcase"
                 title="Date profesionale"
@@ -191,6 +240,17 @@ export default function ProfileScreen() {
                   a lui.
                 </Text>
               </MenuItem>
+              {DEMO_TOOLS && (
+                <MenuItem icon="play-circle" title="Date pentru demonstrație" open={open === "demo"} onPress={() => toggle("demo")}>
+                  <Text style={styles.panelText}>
+                    Generează un istoric realist de doze bifate pentru ultimele 14 zile (unele întârziate sau ratate), ca medicul să
+                    vadă raportul de aderență. Folosește doar pentru prezentare.
+                  </Text>
+                  <PrimaryButton title="Generează istoric de medicație" onPress={generateDemoIntakes} loading={demoBusy} disabled={meds.length === 0} />
+                  <PrimaryButton title="Simulează o consultație încheiată (pentru recenzie)" variant="outline" onPress={simulateFinishedAppointment} loading={demoBusy} />
+                  {!!demoMsg && <Text style={styles.note}>{demoMsg}</Text>}
+                </MenuItem>
+              )}
               <MenuItem
                 icon="bell"
                 title="Notificări"

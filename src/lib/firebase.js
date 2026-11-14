@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { initializeAppCheck, CustomProvider } from 'firebase/app-check';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Valorile vin din fișierul .env (vezi .env.example).
@@ -40,6 +41,24 @@ if (isFirebaseConfigured) {
   }
   db = getFirestore(app);
   storage = getStorage(app);
+
+  // App Check pentru asistentul Gemini (Firebase AI Logic îl aplică automat).
+  // Pentru dezvoltare / hackathon folosim un TOKEN DE DEBUG înregistrat în consolă:
+  // App Check → Apps → aplicația Web → ⋮ → Manage debug tokens.
+  // Nu urca .env pe GitHub și șterge tokenul din consolă după hackathon.
+  const appCheckDebugToken = process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN;
+  if (appCheckDebugToken) {
+    globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = appCheckDebugToken;
+    try {
+      initializeAppCheck(app, {
+        // În modul debug furnizorul nu e folosit – tokenul de debug se schimbă direct cu Firebase.
+        provider: new CustomProvider({ getToken: () => Promise.reject(new Error('Doar modul debug.')) }),
+        isTokenAutoRefreshEnabled: false,
+      });
+    } catch {
+      // deja inițializat (fast refresh)
+    }
+  }
 }
 
 // Încărcarea de PDF-uri cere Firebase Storage, disponibil doar pe planul Blaze.

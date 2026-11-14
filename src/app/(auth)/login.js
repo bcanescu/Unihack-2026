@@ -106,7 +106,7 @@ export default function LoginScreen() {
               error={!!error}
             />
 
-            <Pressable onPress={handleForgotPassword} hitSlop={10} style={styles.forgot} accessibilityRole="link">
+            <Pressable onPress={handleForgotPassword} hitSlop={10} style={styles.forgot} accessibilityRole="button">
               <Text style={styles.link}>Ai uitat parola?</Text>
             </Pressable>
 
@@ -124,7 +124,7 @@ export default function LoginScreen() {
           <View style={styles.footer}>
             <Text style={styles.footerText}>Nu ai cont? </Text>
             <Link href="/register" asChild>
-              <Pressable hitSlop={10} accessibilityRole="link">
+              <Pressable hitSlop={10} accessibilityRole="button">
                 <Text style={styles.link}>Creează cont</Text>
               </Pressable>
             </Link>

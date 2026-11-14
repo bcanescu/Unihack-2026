@@ -114,12 +114,22 @@ service cloud.firestore {
     // patients/{uid}/labs/{labId} – buletine de analize (adăugate de medic)
     match /patients/{uid}/labs/{labId} {
       allow read: if isOwner(uid) || (isVerifiedDoctor() && hasActiveLink(uid));
+      // Pacientul își poate adăuga singur analize (poză + OCR sau manual), marcate source: 'patient'.
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(
+             ['title', 'labName', 'date', 'results', 'note', 'file', 'source', 'addedBy', 'addedByName', 'createdAt'])
+        && request.resource.data.source == 'patient'
+        && request.resource.data.addedBy == request.auth.uid
+        && request.resource.data.file == null
+        && request.resource.data.results is list && request.resource.data.results.size() <= 100
+        && request.resource.data.title is string && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120;
       allow create: if isVerifiedDoctor() && hasActiveLink(uid)
         && request.resource.data.keys().hasOnly(
              ['title', 'labName', 'date', 'results', 'note', 'file', 'addedBy', 'addedByName', 'createdAt'])
         && request.resource.data.title is string && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 120
-        && request.resource.data.results is list && request.resource.data.results.size() <= 40
+        && request.resource.data.results is list && request.resource.data.results.size() <= 100
         && request.resource.data.note is string && request.resource.data.note.size() <= 1000
         && request.resource.data.addedBy == request.auth.uid
         && request.resource.data.addedByName == userDoc().name;
@@ -187,8 +197,44 @@ service cloud.firestore {
     // Se completează de administrator, din aplicație (aprobare / adăugare directă).
     match /doctors/{uid} {
       allow read: if signedIn();
-      allow create, update: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        // Medicul își editează doar profilul public (nu numele, specializarea, spitalul sau verificarea).
+        || (isOwner(uid) && isVerifiedDoctor()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['hospitalRole', 'experienceYears', 'bio', 'education', 'achievements'])
+            && request.resource.data.bio is string && request.resource.data.bio.size() <= 800
+            && request.resource.data.hospitalRole is string && request.resource.data.hospitalRole.size() <= 120
+            && request.resource.data.education is list && request.resource.data.education.size() <= 10
+            && request.resource.data.achievements is list && request.resource.data.achievements.size() <= 10);
       allow delete: if false;
+    }
+
+    // reviews/{appointmentId}: { doctorUid, patientUid, authorName, rating, comment, appointmentDate, reason, createdAt }
+    // ID = programarea → o singură recenzie pe consultație. Doar pacientul programării, doar pentru o programare
+    // neanulată la acel medic. Publice pentru utilizatorii logați. Nu se modifică; adminul poate șterge abuzurile.
+    match /reviews/{apptId} {
+      function appt() { return get(/databases/$(db)/documents/appointments/$(apptId)).data; }
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(
+             ['doctorUid', 'patientUid', 'authorName', 'rating', 'comment', 'appointmentDate', 'reason', 'createdAt'])
+        && request.resource.data.patientUid == request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() >= 3 && request.resource.data.comment.size() <= 500
+        && request.resource.data.authorName is string && request.resource.data.authorName.size() <= 40
+        && appt().patientUid == request.auth.uid
+        && appt().doctorUid == request.resource.data.doctorUid
+        && appt().status == 'booked'
+        && appt().date == request.resource.data.appointmentDate
+        // consultația trebuie să fi avut loc (data programării ≤ ziua de azi)
+        && appt().date <= string(request.time.year()) + '-'
+             + (request.time.month() < 10 ? '0' : '') + string(request.time.month()) + '-'
+             + (request.time.day() < 10 ? '0' : '') + string(request.time.day());
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     // ── Programări ────────────────────────────────────────────
@@ -225,12 +271,20 @@ service cloud.firestore {
         && request.resource.data.slotId == expectedSlotId(request.resource.data)
         && getAfter(/databases/$(db)/documents/busySlots/$(request.resource.data.slotId)).data.appointmentId == id;
 
-      // Oricare dintre cei doi poate anula. Programarea rămâne în istoric.
-      allow update: if signedIn()
-        && (resource.data.patientUid == request.auth.uid || resource.data.doctorUid == request.auth.uid)
-        && resource.data.status == 'booked'
-        && request.resource.data.status == 'cancelled'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledBy', 'cancelledAt']);
+      allow update: if
+        // Oricare dintre cei doi poate anula. Programarea rămâne în istoric.
+        (signedIn()
+          && (resource.data.patientUid == request.auth.uid || resource.data.doctorUid == request.auth.uid)
+          && resource.data.status == 'booked'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledBy', 'cancelledAt']))
+        ||
+        // Pacientul confirmă prezența (reduce neprezentările).
+        (signedIn()
+          && resource.data.patientUid == request.auth.uid
+          && resource.data.status == 'booked'
+          && request.resource.data.confirmed == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['confirmed', 'confirmedAt']));
 
       allow delete: if false;
     }

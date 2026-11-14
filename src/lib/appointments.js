@@ -13,6 +13,7 @@ import {
   collection,
   doc,
   getDoc,
+  updateDoc,
   writeBatch,
   onSnapshot,
   query,
@@ -26,7 +27,16 @@ import { dateKey, addDays } from './medications';
 // Program implicit al medicilor (pentru hackathon): luni–vineri, 09:00–13:00, la 30 de minute.
 export const SCHEDULE = { workDays: [1, 2, 3, 4, 5], start: '09:00', end: '13:00', slotMinutes: 30 };
 export const SCHEDULE_TEXT = 'Luni–Vineri, 09:00–13:00';
-export const REASONS = ['Consult', 'Control', 'Citire analize', 'Tratament'];
+export const REASONS = ['Consult', 'Control', 'Citire analize', 'Tratament', 'Analize de sânge', 'Ecografie abdominală'];
+
+// Instrucțiuni de pregătire, după motivul programării (trimise și în reminder).
+export const PREP = {
+  'Analize de sânge': 'Vino nemâncat: nu mânca cu 8–12 ore înainte. Poți bea apă plată.',
+  'Ecografie abdominală': 'Nu mânca cu 6 ore înainte și bea 1 litru de apă cu o oră înainte, fără să urinezi.',
+  'Citire analize': 'Adu buletinele de analize (sau arată-le din tabul Analize).',
+  Control: 'Adu lista medicamentelor pe care le iei și analizele recente.',
+  Consult: 'Notează-ți simptomele și de când au apărut.',
+};
 
 const pad = (n) => String(n).padStart(2, '0');
 const toMin = (t) => {
@@ -116,7 +126,7 @@ export async function bookAppointment(patient, doctor, key, time, reason) {
     demoStore.state.appointments[id] = { ...data, createdAt: new Date() };
     demoStore.state.busySlots[sid] = { doctorUid: doctor.doctorUid, date: key, time, appointmentId: id };
     demoStore.emit();
-    return;
+    return { id, ...data };
   }
 
   const apptRef = doc(collection(db, 'appointments'));
@@ -136,6 +146,17 @@ export async function bookAppointment(patient, doctor, key, time, reason) {
     }
     throw e;
   }
+  return { id: apptRef.id, ...data };
+}
+
+/** Pacientul confirmă că vine la programare – medicul vede confirmarea în timp real. */
+export async function confirmAttendance(appt) {
+  if (!isFirebaseConfigured) {
+    Object.assign(demoStore.state.appointments[appt.id], { confirmed: true, confirmedAt: new Date() });
+    demoStore.emit();
+    return;
+  }
+  await updateDoc(doc(db, 'appointments', appt.id), { confirmed: true, confirmedAt: serverTimestamp() });
 }
 
 /** Anulare (de către pacient sau medic): programarea rămâne în istoric, slotul se eliberează. */

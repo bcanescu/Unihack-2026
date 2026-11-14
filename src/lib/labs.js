@@ -156,6 +156,87 @@ export async function addLab(doctor, pid, { title, labName, date, results, note 
   return labRef.id;
 }
 
+/**
+ * Pacientul își adaugă singur analize vechi (de la orice laborator), prin poză + OCR sau manual.
+ * Sunt marcate `source: 'patient'` – medicul vede că nu au fost introduse de un medic.
+ */
+export async function addPatientLab(patient, { title, labName, date, results }) {
+  const data = {
+    title: title.trim(),
+    labName: labName.trim(),
+    date,
+    results,
+    note: '',
+    file: null,
+    source: 'patient',
+    addedBy: patient.uid,
+    addedByName: patient.name,
+  };
+  if (!isFirebaseConfigured) {
+    const id = `l${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    demoLabs(patient.uid)[id] = { ...data, createdAt: new Date() };
+    demoStore.emit();
+    return id;
+  }
+  const labRef = doc(collection(db, 'patients', patient.uid, 'labs'));
+  await setDoc(labRef, { ...data, createdAt: serverTimestamp() });
+  return labRef.id;
+}
+
+// Istoric de exemplu (laboratoare fictive) – ca graficele de evoluție să aibă ce arăta la prezentare.
+export const SAMPLE_HISTORY = [
+  {
+    title: 'Analize de rutină',
+    labName: 'Laborator Central Timișoara',
+    date: '2024-11-20',
+    results: [
+      { name: 'Glicemie a jeun', value: 98, unit: 'mg/dL', min: 70, max: 100 },
+      { name: 'HbA1c', value: 5.5, unit: '%', min: 4, max: 5.6 },
+      { name: 'Colesterol total', value: 241, unit: 'mg/dL', min: null, max: 200 },
+      { name: 'LDL colesterol', value: 158, unit: 'mg/dL', min: null, max: 100 },
+    ],
+  },
+  {
+    title: 'Control',
+    labName: 'Clinica Medicală Vest',
+    date: '2025-05-14',
+    results: [
+      { name: 'Glicemie a jeun', value: 104, unit: 'mg/dL', min: 70, max: 100 },
+      { name: 'HbA1c', value: 5.7, unit: '%', min: 4, max: 5.6 },
+      { name: 'Colesterol total', value: 232, unit: 'mg/dL', min: null, max: 200 },
+      { name: 'LDL colesterol', value: 149, unit: 'mg/dL', min: null, max: 100 },
+    ],
+  },
+  {
+    title: 'Analize anuale',
+    labName: 'Policlinica Nord',
+    date: '2025-11-03',
+    results: [
+      { name: 'Glicemie a jeun', value: 112, unit: 'mg/dL', min: 70, max: 100 },
+      { name: 'HbA1c', value: 5.9, unit: '%', min: 4, max: 5.6 },
+      { name: 'Colesterol total', value: 221, unit: 'mg/dL', min: null, max: 200 },
+      { name: 'LDL colesterol', value: 141, unit: 'mg/dL', min: null, max: 100 },
+    ],
+  },
+  {
+    title: 'Control după tratament',
+    labName: 'Laborator Central Timișoara',
+    date: '2026-05-21',
+    results: [
+      { name: 'Glicemie a jeun', value: 109, unit: 'mg/dL', min: 70, max: 100 },
+      { name: 'HbA1c', value: 5.8, unit: '%', min: 4, max: 5.6 },
+      { name: 'Colesterol total', value: 205, unit: 'mg/dL', min: null, max: 200 },
+      { name: 'LDL colesterol', value: 128, unit: 'mg/dL', min: null, max: 100 },
+    ],
+  },
+];
+
+export async function addSampleHistory(patient) {
+  for (const lab of SAMPLE_HISTORY) {
+    await addPatientLab(patient, { ...lab, labName: `${lab.labName} (exemplu)` });
+  }
+}
+
 /** URL-ul PDF-ului se cere doar la deschidere – Storage verifică accesul în acel moment. */
 export async function getLabFileUrl(lab) {
   if (!lab.file) return null;

@@ -4,13 +4,12 @@
  * Cheia Gemini NU este în aplicație: apelurile trec prin proiectul Firebase (AI Logic → Gemini Developer API).
  * Configurare: consola Firebase → AI Services → AI Logic → Get started → Gemini Developer API.
  */
-import { getApp } from 'firebase/app';
-import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase/ai';
+import { getGenerativeModel } from 'firebase/ai';
 import { isFirebaseConfigured } from './firebase';
+import { getMedlyAI, MODEL } from './ai';
 import { flagOf, rangeText, formatLabDate } from './labs';
 
-// Numele modelelor se schimbă des – verifică lista actuală în consola AI Logic și schimbă doar aici.
-export const MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-3.5-flash-lite';
+export { MODEL };
 
 export const MAX_INPUT = 1000;
 const MAX_TURNS = 12; // istoric scurt: răspunsuri mai rapide și cotă gratuită consumată mai încet
@@ -68,8 +67,7 @@ let model = null;
 
 function getModel() {
   if (!model) {
-    const ai = getAI(getApp(), { backend: new GoogleAIBackend() });
-    model = getGenerativeModel(ai, { model: MODEL, systemInstruction: SYSTEM });
+    model = getGenerativeModel(getMedlyAI(), { model: MODEL, systemInstruction: SYSTEM });
   }
   return model;
 }
@@ -101,6 +99,7 @@ export async function askAssistant(history, text) {
 /** Mesajul trimis când pacientul cere explicarea unui buletin (doar valorile, fără nume sau CNP). */
 export function labExplainPrompt(lab) {
   const lines = lab.results.map((r) => {
+    if (r.value == null) return `• ${r.name}: ${r.text ?? '—'}`;
     const f = flagOf(r);
     const flag = f === 'high' ? 'crescut' : f === 'low' ? 'scăzut' : 'în limite';
     return `• ${r.name}: ${r.value} ${r.unit} (referință ${rangeText(r)}) – ${flag}`;
@@ -119,8 +118,8 @@ export function assistantErrorMessage(e) {
   const msg = String(e?.message ?? '').toLowerCase();
   if (code === 'api-not-enabled' || msg.includes('not been used') || msg.includes('disabled'))
     return 'Asistentul nu este activat. Activează Firebase AI Logic (Gemini Developer API) în consola Firebase.';
-  if (msg.includes('app check') || msg.includes('appcheck'))
-    return 'Cererea a fost blocată de App Check. Pentru testare, dezactivează aplicarea App Check pentru AI Logic.';
+  if (msg.includes('app check') || msg.includes('appcheck') || msg.includes('app-check') || msg.includes('attestation'))
+    return 'Cererea a fost blocată de App Check. Verifică EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN din .env și că tokenul e înregistrat în consolă (App Check → Apps → Manage debug tokens).';
   if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted'))
     return 'Asistentul a primit prea multe întrebări într-un timp scurt. Încearcă din nou peste un minut.';
   if (msg.includes('not found') && msg.includes('model'))

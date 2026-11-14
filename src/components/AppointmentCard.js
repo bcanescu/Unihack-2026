@@ -15,9 +15,11 @@ export default function AppointmentCard({
   appt,
   perspective,
   onCancel,
+  onConfirm,
   onPress,
   showDate = true,
 }) {
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const cancelled = appt.status === "cancelled";
@@ -62,6 +64,20 @@ export default function AppointmentCard({
             {appt.hospital}
           </Text>
         )}
+        {!cancelled && appt.confirmed && (
+          <View style={[styles.badge, { backgroundColor: colors.successSoft }]}>
+            <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+            <Text style={[styles.badgeText, { color: colors.success }]}>
+              {perspective === "doctor" ? "Prezență confirmată" : "Ai confirmat prezența"}
+            </Text>
+          </View>
+        )}
+        {!cancelled && !appt.confirmed && perspective === "doctor" && (
+          <View style={[styles.badge, { backgroundColor: colors.surface }]}>
+            <Ionicons name="help-circle-outline" size={14} color={colors.textMuted} />
+            <Text style={[styles.badgeText, { color: colors.textMuted }]}>Neconfirmat</Text>
+          </View>
+        )}
         {cancelled && (
           <Text style={styles.cancelledText}>
             Anulată
@@ -92,6 +108,21 @@ export default function AppointmentCard({
         </Pressable>
       ) : (
         info
+      )}
+
+      {onConfirm && !cancelled && !appt.confirmed && !confirming && (
+        <PrimaryButton
+          title="✓  Confirm prezența"
+          loading={confirmBusy}
+          onPress={async () => {
+            setConfirmBusy(true);
+            try {
+              await onConfirm(appt);
+            } finally {
+              setConfirmBusy(false);
+            }
+          }}
+        />
       )}
 
       {onCancel &&
@@ -165,6 +196,17 @@ const styles = StyleSheet.create({
   },
   who: { fontSize: font.body + 1, fontWeight: "700", color: colors.text },
   meta: { fontSize: font.small, color: colors.textMuted },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    marginTop: 2,
+  },
+  badgeText: { fontSize: font.small - 2, fontWeight: "700" },
   cancelledText: {
     fontSize: font.small - 1,
     fontWeight: "700",

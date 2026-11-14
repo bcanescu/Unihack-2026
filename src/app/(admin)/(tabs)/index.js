@@ -71,7 +71,7 @@ function ApplicationCard({ app, admin }) {
       </View>
 
       {app.file && (
-        <Pressable onPress={openPdf} style={styles.pdfLink} accessibilityRole="link">
+        <Pressable onPress={openPdf} style={styles.pdfLink} accessibilityRole="button">
           <Ionicons name="document-attach-outline" size={18} color={colors.primary} />
           <Text style={styles.linkText}>Deschide avizul (PDF)</Text>
         </Pressable>

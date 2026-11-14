@@ -25,6 +25,16 @@ if (remindersSupported) {
   });
 }
 
+/** Anulează doar reminderele de MEDICAȚIE (cele de programări rămân). */
+async function cancelMedicationReminders() {
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of all) {
+    if (n.content?.data?.kind === 'med') {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {});
+    }
+  }
+}
+
 export async function getRemindersEnabled() {
   try {
     return (await AsyncStorage.getItem(PREF_KEY)) === 'on';
@@ -37,7 +47,7 @@ export async function setRemindersEnabled(on) {
   try {
     await AsyncStorage.setItem(PREF_KEY, on ? 'on' : 'off');
   } catch {}
-  if (!on && remindersSupported) await Notifications.cancelAllScheduledNotificationsAsync();
+  if (!on && remindersSupported) await cancelMedicationReminders();
 }
 
 /** Cere permisiunea pentru notificări. Returnează true dacă e acordată. */
@@ -58,7 +68,7 @@ export async function ensurePermission() {
 /** Reprogramează reminderele pe baza tratamentului curent. */
 export async function syncReminders(meds) {
   if (!remindersSupported) return 0;
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  await cancelMedicationReminders();
 
   const today = dateKey();
   const byTime = {};
@@ -76,7 +86,7 @@ export async function syncReminders(meds) {
       content: {
         title: `💊 Ora ${time} – medicamentele tale`,
         body: byTime[time].join(', '),
-        data: { screen: 'today' },
+        data: { kind: 'med', url: '/' },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -100,4 +110,86 @@ export async function sendTestReminder(seconds = 5) {
       channelId: CHANNEL_ID,
     },
   });
+}
+
+// ── Remindere pentru programări ──────────────────────────────────────────────
+// Notificări locale (merg și în Expo Go): cu o zi înainte la 18:00 și cu 2 ore înainte.
+// ID-urile notificărilor se păstrează local, ca să le putem anula dacă programarea se anulează.
+const APPT_KEY = 'medly:apptReminders';
+
+async function readApptMap() {
+  try {
+    return JSON.parse((await AsyncStorage.getItem(APPT_KEY)) || '{}');
+  } catch {
+    return {};
+  }
+}
+async function writeApptMap(map) {
+  try {
+    await AsyncStorage.setItem(APPT_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+const atLocal = (dateKey, time) => {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const [h, min] = time.split(':').map(Number);
+  return new Date(y, m - 1, d, h, min);
+};
+
+/**
+ * Programează reminderele pentru o programare. prep = instrucțiunile de pregătire (opțional).
+ * Returnează lista momentelor programate (pentru mesajul de confirmare din aplicație).
+ */
+export async function scheduleAppointmentReminders(appt, prep) {
+  const when = atLocal(appt.date, appt.time);
+  const dayBefore = new Date(when);
+  dayBefore.setDate(dayBefore.getDate() - 1);
+  dayBefore.setHours(18, 0, 0, 0);
+  const twoHours = new Date(when.getTime() - 2 * 60 * 60 * 1000);
+  const now = Date.now() + 60 * 1000;
+
+  const plan = [
+    {
+      at: dayBefore,
+      label: 'cu o zi înainte, la 18:00',
+      title: `📅 Mâine la ${appt.time}: ${appt.doctorName}`,
+      body: `${appt.reason}. Confirmă prezența cu un tap.${prep ? `\n${prep}` : ''}`,
+    },
+    {
+      at: twoHours,
+      label: 'cu 2 ore înainte',
+      title: `⏰ Peste 2 ore: ${appt.doctorName}`,
+      body: `${appt.reason} la ${appt.time}${appt.hospital ? ` · ${appt.hospital}` : ''}.${prep ? `\n${prep}` : ''}`,
+    },
+  ].filter((p) => p.at.getTime() > now);
+
+  if (!remindersSupported || plan.length === 0) return plan.map((p) => p.label);
+  const ok = await ensurePermission().catch(() => false);
+  if (!ok) return [];
+
+  const ids = [];
+  for (const p of plan) {
+    ids.push(
+      await Notifications.scheduleNotificationAsync({
+        content: { title: p.title, body: p.body, data: { url: '/appointments' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: CHANNEL_ID },
+      })
+    );
+  }
+  const map = await readApptMap();
+  map[appt.id] = ids;
+  await writeApptMap(map);
+  return plan.map((p) => p.label);
+}
+
+/** Anulează reminderele unei programări (anulată de pacient sau de medic). */
+export async function cancelAppointmentReminders(apptId) {
+  const map = await readApptMap();
+  const ids = map[apptId];
+  if (!ids) return;
+  if (remindersSupported) {
+    for (const id of ids) await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  }
+  delete map[apptId];
+  await writeApptMap(map);
 }

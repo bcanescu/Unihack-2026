@@ -9,7 +9,9 @@ import { subscribePatientLinks, respondToRequest, revokeAccess, toDate } from '.
 import PrimaryButton from '../../../components/PrimaryButton';
 import TodayMeds from '../../../components/TodayMeds';
 import AppointmentCard from '../../../components/AppointmentCard';
-import { subscribePatientAppointments, isPastSlot } from '../../../lib/appointments';
+import { subscribePatientAppointments, isPastSlot, confirmAttendance } from '../../../lib/appointments';
+import { subscribeMyReviews, isAppointmentFinished } from '../../../lib/doctorProfile';
+import { addDays, dateKey } from '../../../lib/medications';
 import { Avatar, GreetingHeader, SectionTitle, Card, StatusBadge, EmptyState } from '../../../components/ui';
 import { colors, spacing, font } from '../../../constants/theme';
 
@@ -135,6 +137,12 @@ export default function PatientHome() {
 
   useEffect(() => subscribePatientAppointments(user.uid, setAppts), [user.uid]);
   const nextAppt = appts.find((a) => a.status === 'booked' && !isPastSlot(a.date, a.time));
+  const [myReviews, setMyReviews] = useState([]);
+  useEffect(() => subscribeMyReviews(user.uid, setMyReviews), [user.uid]);
+  const reviewed = new Set(myReviews.map((r) => r.id));
+  const toReview = [...appts]
+    .reverse()
+    .find((a) => isAppointmentFinished(a) && !reviewed.has(a.id) && a.date >= addDays(dateKey(), -14));
 
   // Cererile apar în timp real, imediat ce medicul le trimite.
   useEffect(() => subscribePatientLinks(user.uid, setLinks), [user.uid]);
@@ -164,10 +172,26 @@ export default function PatientHome() {
           </View>
         )}
 
+        {toReview && (
+          <Pressable
+            onPress={() => router.push(`/review/${toReview.id}`)}
+            style={({ pressed }) => [styles.reviewBanner, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Lasă o recenzie pentru ${toReview.doctorName}`}
+          >
+            <Ionicons name="star" size={24} color="#F59E0B" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reviewTitle}>Cum a fost consultația cu {toReview.doctorName}?</Text>
+              <Text style={styles.reviewSub}>Lasă o recenzie în 30 de secunde – îi ajuți pe ceilalți pacienți.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+          </Pressable>
+        )}
+
         {nextAppt && (
           <View style={styles.section}>
             <SectionTitle>Următoarea programare</SectionTitle>
-            <AppointmentCard appt={nextAppt} perspective="patient" onPress={() => router.push('/appointments')} />
+            <AppointmentCard appt={nextAppt} perspective="patient" onPress={() => router.push('/appointments')} onConfirm={confirmAttendance} />
           </View>
         )}
 
@@ -209,6 +233,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { padding: spacing.lg, gap: spacing.lg, maxWidth: 560, width: '100%', alignSelf: 'center' },
   section: { gap: spacing.sm + 4 },
+  reviewBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: 16, backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A' },
+  reviewTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  reviewSub: { fontSize: font.small - 1, color: colors.textMuted, marginTop: 2 },
   alertHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   name: { fontSize: font.body + 1, fontWeight: '700', color: colors.text },

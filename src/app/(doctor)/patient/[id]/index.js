@@ -8,14 +8,17 @@ import { useAuth } from '../../../../context/AuthContext';
 import { getPatientSummary, getLink, ageFrom, requestAccess } from '../../../../lib/careLinks';
 import {
   subscribeMedications,
-  subscribeIntakes,
+  subscribeIntakesSince,
+  addDays,
   stopMedication,
   dateKey,
   isActiveOn,
   intakeId,
 } from '../../../../lib/medications';
 import TopBar from '../../../../components/TopBar';
+import { computeAdherence, adherencePercent, percentColor } from '../../../../lib/adherence';
 import { LabListItem } from '../../../../components/LabViews';
+import LabTrends from '../../../../components/LabTrends';
 import { subscribeLabs } from '../../../../lib/labs';
 import PrimaryButton from '../../../../components/PrimaryButton';
 import { Avatar, SectionTitle, Card, EmptyState } from '../../../../components/ui';
@@ -127,7 +130,13 @@ export default function PatientFile() {
 
   // Tratamentul și dozele bifate azi – în timp real.
   useEffect(() => subscribeMedications(patientUid, setMeds, () => setNoAccess(true)), [patientUid]);
-  useEffect(() => subscribeIntakes(patientUid, today, setIntakes), [patientUid, today]);
+  // Dozele bifate în ultimele 7 zile: pentru „Azi: x/y luate” și pentru rezumatul de aderență.
+  const weekStart = addDays(today, -6);
+  const [weekIntakes, setWeekIntakes] = useState([]);
+  useEffect(() => subscribeIntakesSince(patientUid, weekStart, setWeekIntakes), [patientUid, weekStart]);
+  useEffect(() => setIntakes(weekIntakes.filter((i) => i.date === today)), [weekIntakes, today]);
+  const week = useMemo(() => computeAdherence(meds, weekIntakes, 7), [meds, weekIntakes]);
+  const weekPercent = adherencePercent(week.total);
   useEffect(() => subscribeLabs(patientUid, setLabs), [patientUid]);
 
   const current = useMemo(
@@ -191,6 +200,31 @@ export default function PatientFile() {
           </View>
         </Card>
 
+        {meds.length > 0 && (
+          <Pressable
+            onPress={() => router.push(`/patient/${patientUid}/adherence`)}
+            accessibilityRole="button"
+            accessibilityLabel="Deschide raportul de aderență"
+            style={({ pressed }) => [pressed && { opacity: 0.75 }]}
+          >
+            <Card style={styles.adhCard}>
+              <View style={styles.adhIcon}>
+                <Ionicons name="stats-chart" size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.adhTitle}>Raport aderență</Text>
+                <Text style={styles.meta}>
+                  Ultimele 7 zile: {week.total.ontime + week.total.late} doze luate · {week.total.missed} ratate
+                </Text>
+              </View>
+              <Text style={[styles.adhPercent, { color: percentColor(weekPercent, colors) }]}>
+                {weekPercent == null ? '—' : `${weekPercent}%`}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </Card>
+          </Pressable>
+        )}
+
         <View style={styles.section}>
           <View style={styles.sectionHead}>
             <SectionTitle count={current.length}>Tratament curent</SectionTitle>
@@ -225,6 +259,7 @@ export default function PatientFile() {
             variant="outline"
             onPress={() => router.push({ pathname: '/add-lab', params: { patientId: patientUid } })}
           />
+          <LabTrends labs={labs} title="Evoluție (toate laboratoarele)" />
           {labs.map((l) => (
             <LabListItem key={l.id} lab={l} onPress={() => router.push(`/patient/${patientUid}/lab/${l.id}`)} />
           ))}
@@ -258,6 +293,10 @@ export default function PatientFile() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   container: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.lg, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  adhCard: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  adhIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  adhTitle: { fontSize: font.body, fontWeight: '800', color: colors.text },
+  adhPercent: { fontSize: font.title - 4, fontWeight: '900' },
   patientHead: { flexDirection: 'row', alignItems: 'center' },
   patientName: { fontSize: font.body + 3, fontWeight: '800', color: colors.text },
   section: { gap: spacing.sm + 4 },

@@ -40,6 +40,7 @@ export function LabListItem({ lab, onPress }) {
             {lab.labName ? ` · ${lab.labName}` : ''}
             {lab.file ? ' · PDF' : ''}
           </Text>
+          {lab.source === 'patient' && <Text style={styles.sourceTag}>Adăugat de pacient</Text>}
           {lab.results.length > 0 && <OutOfRangeBadge lab={lab} />}
         </View>
         <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
@@ -74,7 +75,9 @@ export function LabDetail({ lab, onExplain }) {
           {formatLabDate(lab.date)}
           {lab.labName ? ` · ${lab.labName}` : ''}
         </Text>
-        <Text style={styles.meta}>Adăugat de {lab.addedByName}</Text>
+        <Text style={styles.meta}>
+          {lab.source === 'patient' ? `Adăugat de pacient (${lab.addedByName}) – nevalidat de medic` : `Adăugat de ${lab.addedByName}`}
+        </Text>
         {lab.results.length > 0 && <OutOfRangeBadge lab={lab} />}
       </View>
 
@@ -94,13 +97,13 @@ export function LabDetail({ lab, onExplain }) {
                 key={`${r.name}-${i}`}
                 style={[styles.tr, i % 2 === 1 && { backgroundColor: '#F8FAFC' }]}
                 accessible
-                accessibilityLabel={`${r.name}: ${r.value ?? 'fără valoare'} ${r.unit}, ${f ? fs.label : ''}, referință ${rangeText(r)}`}
+                accessibilityLabel={`${r.name}: ${r.value ?? r.text ?? 'fără valoare'} ${r.unit}, ${f ? fs.label : ''}, referință ${rangeText(r)}`}
               >
                 <Text style={[styles.td, { flex: 1.4, fontWeight: '600' }]}>{r.name}</Text>
                 <View style={[styles.valueCell, { flex: 1 }]}>
                   {out && <Ionicons name={fs.icon} size={14} color={fs.color} />}
                   <Text style={[styles.value, { color: out ? fs.color : colors.text }]}>
-                    {r.value ?? '—'} <Text style={styles.unit}>{r.unit}</Text>
+                    {r.value ?? r.text ?? '—'} <Text style={styles.unit}>{r.unit}</Text>
                   </Text>
                 </View>
                 <Text style={[styles.td, styles.ref, { flex: 0.9 }]}>{rangeText(r)}</Text>
@@ -159,6 +162,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sourceTag: { fontSize: font.small - 2, fontWeight: '700', color: colors.warning },
   listTitle: { fontSize: font.body + 1, fontWeight: '800', color: colors.text },
   meta: { fontSize: font.small, color: colors.textMuted },
   title: { fontSize: font.title - 2, fontWeight: '800', color: colors.text },

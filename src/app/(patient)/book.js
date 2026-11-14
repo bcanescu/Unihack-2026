@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { subscribePatientLinks } from '../../lib/careLinks';
 import { getDoctors, uniqueSorted } from '../../lib/doctors';
+import { subscribeRatings } from '../../lib/doctorProfile';
+import { RatingInline } from '../../components/Stars';
 import {
   subscribeBusy,
   bookAppointment,
@@ -17,8 +19,10 @@ import {
   formatDayShort,
   formatDayLong,
   REASONS,
+  PREP,
   SCHEDULE_TEXT,
 } from '../../lib/appointments';
+import { scheduleAppointmentReminders, remindersSupported } from '../../lib/reminders';
 import TopBar from '../../components/TopBar';
 import PrimaryButton from '../../components/PrimaryButton';
 import Chip from '../../components/Chip';
@@ -27,24 +31,37 @@ import { colors, spacing, radius, font } from '../../constants/theme';
 
 const ALL = 'Toate';
 
-function DoctorOption({ doctor, selected, onPress, linked }) {
+function DoctorOption({ doctor, selected, onPress, linked, rating }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ selected }} accessibilityLabel={doctor.doctorName}>
-      <Card style={[styles.doctorRow, selected && styles.doctorSelected]}>
-        <Avatar name={doctor.doctorName} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={styles.doctorName}>{doctor.doctorName}</Text>
-          <Text style={styles.meta}>{doctor.doctorSpecialty}</Text>
-          {!!doctor.hospital && (
-            <Text style={styles.hospital} numberOfLines={2}>
-              <Ionicons name="business-outline" size={12} color={colors.textMuted} /> {doctor.hospital}
-            </Text>
-          )}
-          {linked && <Text style={styles.linked}>Medicul tău</Text>}
-        </View>
-        <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={24} color={selected ? colors.primary : colors.border} />
-      </Card>
-    </Pressable>
+    <View style={{ gap: 4 }}>
+      <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ selected }} accessibilityLabel={doctor.doctorName}>
+        <Card style={[styles.doctorRow, selected && styles.doctorSelected]}>
+          <Avatar name={doctor.doctorName} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.doctorName}>{doctor.doctorName}</Text>
+            <Text style={styles.meta}>{doctor.doctorSpecialty}</Text>
+            {!!doctor.hospital && (
+              <Text style={styles.hospital} numberOfLines={2}>
+                <Ionicons name="business-outline" size={12} color={colors.textMuted} /> {doctor.hospital}
+              </Text>
+            )}
+            <RatingInline avg={rating?.avg} count={rating?.count ?? 0} size={13} />
+            {linked && <Text style={styles.linked}>Medicul tău</Text>}
+          </View>
+          <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={24} color={selected ? colors.primary : colors.border} />
+        </Card>
+      </Pressable>
+      {/* În afara butonului de selecție – altfel pe web ar fi buton în buton. */}
+      <Pressable
+        onPress={() => router.push({ pathname: `/doctor/${doctor.doctorUid}`, params: { fromBooking: '1' } })}
+        style={styles.profileLink}
+        accessibilityRole="button"
+        accessibilityLabel={`Profil și recenzii: ${doctor.doctorName}`}
+      >
+        <Ionicons name="person-circle-outline" size={16} color={colors.primary} />
+        <Text style={styles.profileLinkText}>Profil, experiență și recenzii</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -112,6 +129,11 @@ export default function BookAppointment() {
   );
 
   const doctor = doctorUid ? allDoctors.get(doctorUid) : null;
+
+  // Media notelor pentru medicii afișați.
+  const [ratings, setRatings] = useState({});
+  const ratingKey = [...allDoctors.keys()].sort().join(',');
+  useEffect(() => subscribeRatings(ratingKey ? ratingKey.split(',') : [], setRatings), [ratingKey]);
   const isLinked = doctor && linkedUids.has(doctor.doctorUid);
 
   useEffect(() => {
@@ -132,8 +154,9 @@ export default function BookAppointment() {
     setSaving(true);
     setError('');
     try {
-      await bookAppointment(user, doctor, day, time, reason);
-      setDone(true);
+      const appt = await bookAppointment(user, doctor, day, time, reason);
+      const labels = await scheduleAppointmentReminders(appt, PREP[reason]).catch(() => []);
+      setDone({ labels });
     } catch (e) {
       setError(
         e?.code === 'slot-taken'
@@ -160,6 +183,25 @@ export default function BookAppointment() {
             {doctor?.doctorName} · {formatDayLong(day)}, ora {time}
           </Text>
           {!!doctor?.hospital && <Text style={styles.text}>{doctor.hospital}</Text>}
+          {!!PREP[reason] && (
+            <View style={styles.prepBox}>
+              <Ionicons name="information-circle" size={20} color={colors.warning} />
+              <Text style={styles.prepText}>
+                <Text style={{ fontWeight: '800' }}>Pregătire: </Text>
+                {PREP[reason]}
+              </Text>
+            </View>
+          )}
+          <View style={styles.reminderBox}>
+            <Ionicons name="notifications" size={18} color={colors.primary} />
+            <Text style={styles.reminderText}>
+              {!remindersSupported
+                ? 'Pe telefon primești remindere înainte de programare.'
+                : done.labels?.length
+                  ? `Îți vom aminti ${done.labels.join(' și ')}.`
+                  : 'Activează notificările pentru Medly ca să primești remindere.'}
+            </Text>
+          </View>
           <View style={{ alignSelf: 'stretch', marginTop: spacing.md }}>
             <PrimaryButton title="Vezi programările mele" onPress={() => router.replace('/appointments')} />
           </View>
@@ -197,7 +239,7 @@ export default function BookAppointment() {
               <Text style={styles.meta}>Nu ai încă medici conectați. Folosește „Caută medic”.</Text>
             ) : (
               myDoctors.map((d) => (
-                <DoctorOption key={d.doctorUid} doctor={d} linked selected={d.doctorUid === doctorUid} onPress={() => setDoctorUid(d.doctorUid)} />
+                <DoctorOption key={d.doctorUid} doctor={d} linked rating={ratings[d.doctorUid]} selected={d.doctorUid === doctorUid} onPress={() => setDoctorUid(d.doctorUid)} />
               ))
             ))}
 
@@ -226,6 +268,7 @@ export default function BookAppointment() {
                     key={d.doctorUid}
                     doctor={d}
                     linked={linkedUids.has(d.doctorUid)}
+                    rating={ratings[d.doctorUid]}
                     selected={d.doctorUid === doctorUid}
                     onPress={() => setDoctorUid(d.doctorUid)}
                   />
@@ -315,6 +358,13 @@ export default function BookAppointment() {
               </View>
             </View>
 
+            {!!PREP[reason] && (
+              <View style={styles.prepBox}>
+                <Ionicons name="information-circle" size={20} color={colors.warning} />
+                <Text style={styles.prepText}>{PREP[reason]}</Text>
+              </View>
+            )}
+
             {!!error && <Text style={styles.error}>{error}</Text>}
 
             <PrimaryButton
@@ -343,6 +393,8 @@ const styles = StyleSheet.create({
   meta: { fontSize: font.small, color: colors.textMuted },
   metaInline: { fontSize: font.small, color: colors.textMuted, fontWeight: '500' },
   hospital: { fontSize: font.small - 1, color: colors.textMuted, lineHeight: 17 },
+  profileLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, minHeight: 30 },
+  profileLinkText: { color: colors.primary, fontWeight: '700', fontSize: font.small },
   linked: { fontSize: font.small - 2, fontWeight: '700', color: colors.success, marginTop: 2 },
   hScroll: { gap: spacing.sm, paddingRight: spacing.md },
   segment: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.pill, padding: 4 },
@@ -375,5 +427,9 @@ const styles = StyleSheet.create({
   slotText: { fontSize: font.body, fontWeight: '700', color: colors.primary },
   slotTextOff: { color: '#94A3B8', textDecorationLine: 'line-through' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  prepBox: { flexDirection: 'row', gap: spacing.sm, alignSelf: 'stretch', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.warningSoft },
+  prepText: { flex: 1, fontSize: font.small + 1, color: colors.warning, lineHeight: 20 },
+  reminderBox: { flexDirection: 'row', gap: spacing.sm, alignSelf: 'stretch', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.accentSoft },
+  reminderText: { flex: 1, fontSize: font.small + 1, color: colors.text, lineHeight: 20 },
   error: { color: colors.error, fontSize: font.small + 1 },
 });

@@ -40,6 +40,7 @@ export default function AddMedication() {
   const [times, setTimes] = useState(['08:00']);
   const [customTime, setCustomTime] = useState('');
   const [duration, setDuration] = useState(7);
+  const [startOffset, setStartOffset] = useState(0);
   const [instructions, setInstructions] = useState('');
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -76,7 +77,7 @@ export default function AddMedication() {
 
     setSaving(true);
     try {
-      await addMedication(user, patientId, { name, dose, times, instructions, durationDays: duration });
+      await addMedication(user, patientId, { name, dose, times, instructions, durationDays: duration, startOffsetDays: startOffset });
       router.back();
     } catch {
       setErrors({ submit: 'Nu am putut salva. Verifică dacă mai ai acces la pacient.' });
@@ -158,6 +159,20 @@ export default function AddMedication() {
           </View>
 
           <View style={styles.group}>
+            <Text style={styles.label}>Început</Text>
+            <View style={styles.chips}>
+              {[
+                ['Azi', 0],
+                ['Acum 7 zile', 7],
+                ['Acum 14 zile', 14],
+                ['Acum 30 de zile', 30],
+              ].map(([label, days]) => (
+                <Chip key={label} label={label} selected={startOffset === days} onPress={() => setStartOffset(days)} />
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.group}>
             <Text style={styles.label}>Durată</Text>
             <View style={styles.chips}>
               {DURATIONS.map((d) => (
@@ -185,7 +200,8 @@ export default function AddMedication() {
             <Ionicons name="phone-portrait-outline" size={18} color={colors.primary} />
             <Text style={styles.summaryText}>
               Pacientul va vedea medicamentul în „Ce iau azi”, de {times.length} {times.length === 1 ? 'dată' : 'ori'} pe
-              zi, {duration ? `timp de ${duration} zile` : 'fără dată de final'}.
+              zi, {duration ? `timp de ${duration} zile` : 'fără dată de final'}
+              {startOffset ? `, începând de acum ${startOffset} zile (tratament deja în curs)` : ''}.
             </Text>
           </View>
 

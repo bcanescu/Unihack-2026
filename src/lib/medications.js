@@ -21,6 +21,7 @@ import {
   query,
   where,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
 import { demoStore } from './demoStore';
@@ -85,8 +86,9 @@ export function subscribeMedications(pid, cb, onError) {
 }
 
 /** Medicul adaugă un medicament. durationDays = null → tratament continuu. */
-export async function addMedication(doctor, pid, { name, dose, times, instructions, durationDays }) {
-  const startDate = dateKey();
+export async function addMedication(doctor, pid, { name, dose, times, instructions, durationDays, startOffsetDays = 0 }) {
+  // startOffsetDays > 0: pacientul urmează deja tratamentul de câteva zile.
+  const startDate = addDays(dateKey(), -startOffsetDays);
   const data = {
     name: name.trim(),
     dose: dose.trim(),
@@ -142,4 +144,70 @@ export async function setIntake(pid, { key, med, time }, taken, day = dateKey())
   const ref = doc(db, 'patients', pid, 'intakes', key);
   if (taken) await setDoc(ref, { medId: med.id, date: day, time, takenAt: serverTimestamp() });
   else await deleteDoc(ref);
+}
+
+// ── Istoric și aderență ──────────────────────────────────────────────────────
+
+/** A fost medicamentul programat în ziua `key`? (include tratamentele oprite, pentru istoric) */
+export const isScheduledOn = (med, key) =>
+  med.startDate <= key && (med.endDate ? med.endDate >= key : med.active !== false);
+
+/** Dozele programate într-o zi, inclusiv pentru tratamentele încheiate între timp. */
+export function scheduledDosesForDay(meds, key) {
+  return meds
+    .filter((m) => isScheduledOn(m, key))
+    .flatMap((med) => med.times.map((time) => ({ key: intakeId(key, med.id, time), med, time, date: key })))
+    .sort((a, b) => a.time.localeCompare(b.time));
+}
+
+/** Toate dozele bifate începând cu ziua `fromKey` (pentru raportul de aderență). */
+export function subscribeIntakesSince(pid, fromKey, cb, onError) {
+  if (!isFirebaseConfigured) return demoSubscribe('intakes', pid, (i) => i.date >= fromKey, cb);
+  const q = query(collection(db, 'patients', pid, 'intakes'), where('date', '>=', fromKey));
+  return onSnapshot(
+    q,
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (e) => (onError ? onError(e) : cb([]))
+  );
+}
+
+/**
+ * DOAR PENTRU DEMONSTRAȚII: pacientul generează un istoric realist de doze bifate
+ * pentru ultimele `days` zile (≈ 80% la timp, câteva întârziate, câteva ratate).
+ */
+export async function addSampleIntakes(pid, meds, days = 14) {
+  const today = dateKey();
+  const now = Date.now();
+  let seed = 7;
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  const writes = [];
+  for (let d = days; d >= 0; d--) {
+    const key = addDays(today, -d);
+    for (const dose of scheduledDosesForDay(meds, key)) {
+      const [y, m, dd] = key.split('-').map(Number);
+      const [h, mi] = dose.time.split(':').map(Number);
+      const scheduled = new Date(y, m - 1, dd, h, mi).getTime();
+      if (scheduled > now) continue;
+      const r = rand();
+      if (r < 0.12) continue; // ratată
+      const delayMin = r < 0.25 ? 70 + Math.floor(rand() * 120) : Math.floor(rand() * 25) - 5; // întârziată / la timp
+      const takenAt = new Date(Math.min(scheduled + delayMin * 60000, now));
+      writes.push({ key: dose.key, medId: dose.med.id, date: key, time: dose.time, takenAt });
+    }
+  }
+  if (!isFirebaseConfigured) {
+    const bucket = demoBucket('intakes', pid);
+    writes.forEach((w) => (bucket[w.key] = { medId: w.medId, date: w.date, time: w.time, takenAt: w.takenAt }));
+    demoStore.emit();
+    return writes.length;
+  }
+  const batch = writeBatch(db);
+  writes.slice(0, 450).forEach((w) =>
+    batch.set(doc(db, 'patients', pid, 'intakes', w.key), { medId: w.medId, date: w.date, time: w.time, takenAt: w.takenAt })
+  );
+  await batch.commit();
+  return Math.min(writes.length, 450);
 }
