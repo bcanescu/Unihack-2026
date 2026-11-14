@@ -11,8 +11,8 @@ npx expo start
 Scanezi codul QR cu **Expo Go** pe telefon, sau apeși `w` pentru browser.
 
 Fără fișier `.env`, aplicația pornește în **modul demo**, cu conturile:
-- Pacient: `pacient@demo.ro` / `demo1234`
-- Medic: `medic@demo.ro` / `demo1234`
+- Pacient: `pacient@demo.ro` / `p1234`
+- Medic: `medic@demo.ro` / `m1234`
 
 CNP-uri fictive, valide ca format, pentru teste la înregistrare: `1970523350012`, `2951111350021`.
 
