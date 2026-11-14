@@ -16,28 +16,6 @@ Fără fișier `.env`, aplicația pornește în **modul demo**, cu conturile:
 
 CNP-uri fictive, valide ca format, pentru teste la înregistrare: `1970523350012`, `2951111350021`.
 
-## Conectare la Firebase
-
-1. Creează un proiect în Firebase Console. La Firestore alege o **regiune din UE** (ex. `eur3`), pentru că nu se mai poate schimba ulterior.
-2. Activează **Authentication → Email/Password**.
-3. Adaugă o aplicație Web și copiază configul în `.env` (pornind de la `.env.example`).
-4. Publică regulile din `firestore.rules`.
-5. Pentru un medic de test: creează utilizatorul în Authentication, apoi în Firestore adaugă
-   documentul `users/{uid}` cu `{ role: "doctor", status: "verified", name: "Dr. ...", specialty: "Cardiologie" }`.
-   Pacienții își fac singuri cont din aplicație („Creează cont”), ca să existe și profilul cu CNP.
-6. **Directorul de medici** (pentru „Caută medic” la programări): pentru fiecare medic creezi în Firestore
-   documentul `doctors/{UID-ul medicului}` cu `{ name: "Dr. Ana Ionescu", specialty: "Cardiologie",
-   hospital: "Institutul de Boli Cardiovasculare Timișoara", verified: true }` (boolean).
-   Pune `hospital` și în `users/{uid}` ca să apară în profilul medicului.
-
-## Contul de administrator (o singură dată)
-
-1. Authentication → Users → **Add user** (ex. `admin@medly.ro`) → copiezi UID-ul.
-2. Firestore → `users/{UID}` → `role: "admin"` (string), `name: "Administrator Medly"` (string).
-3. Te autentifici în aplicație cu acel cont → ajungi în ecranele de administrare.
-
-Rolul de admin nu se poate obține din aplicație: regulile permit crearea lui doar din consolă.
-În modul demo: butonul **Admin** de pe ecranul de login.
 
 ## Fluxul de consimțământ
 
