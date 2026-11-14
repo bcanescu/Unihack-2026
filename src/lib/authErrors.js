@@ -12,7 +12,9 @@ const messages = {
   'auth/weak-password': 'Parola trebuie să aibă cel puțin 6 caractere.',
   'app/cnp-taken': 'Acest CNP este deja asociat unui cont. Dacă e al tău, autentifică-te.',
   'app/no-role': 'Contul nu are un rol atribuit. Contactează administratorul.',
-  'app/doctor-pending': 'Contul de medic este în curs de verificare.',
+  'app/doctor-pending': 'Cererea ta de cont de medic este în curs de verificare. Vei putea intra după aprobare.',
+  'app/doctor-rejected': 'Cererea de cont de medic a fost respinsă. Contactează administratorul.',
+  'app/doctor-disabled': 'Contul de medic a fost dezactivat. Contactează administratorul.',
 };
 
 export function authErrorMessage(error) {

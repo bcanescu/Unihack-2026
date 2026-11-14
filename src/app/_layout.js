@@ -11,6 +11,7 @@ import { colors } from '../constants/theme';
  *  - nelogat  → (auth)/login
  *  - pacient  → (patient)
  *  - medic    → (doctor)
+ *  - admin    → (admin)
  * Un pacient nu poate ajunge în ecranele de medic nici prin link direct.
  */
 function RootNavigator() {
@@ -36,6 +37,10 @@ function RootNavigator() {
 
       <Stack.Protected guard={user?.role === 'doctor'}>
         <Stack.Screen name="(doctor)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={user?.role === 'admin'}>
+        <Stack.Screen name="(admin)" />
       </Stack.Protected>
     </Stack>
   );

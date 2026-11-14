@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { getLab } from '../../../lib/labs';
 import TopBar from '../../../components/TopBar';
@@ -24,7 +24,12 @@ export default function PatientLabDetail() {
       <ScrollView contentContainerStyle={styles.container}>
         {lab === undefined && <ActivityIndicator color={colors.primary} />}
         {lab === null && <EmptyState icon="document-outline" title="Buletinul nu a fost găsit" />}
-        {lab && <LabDetail lab={lab} />}
+        {lab && (
+          <LabDetail
+            lab={lab}
+            onExplain={() => router.push({ pathname: '/assistant', params: { labId: lab.id } })}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );

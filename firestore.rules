@@ -16,20 +16,50 @@ service cloud.firestore {
       return exists(linkPath(patientUid)) && get(linkPath(patientUid)).data.status == 'active';
     }
 
-    // users/{uid}: { role: "patient" | "doctor", name, status, createdAt }
+    // Administrator: contul se creează DOAR din consola Firebase (users/{uid}.role = "admin").
+    function isAdmin() { return signedIn() && userDoc().role == 'admin'; }
+
+    // users/{uid}: { role: "patient" | "doctor" | "admin", name, status, specialty, hospital, createdAt }
     match /users/{uid} {
-      allow read: if isOwner(uid);
+      allow read: if isOwner(uid) || isAdmin();
 
-      // La înregistrare, oricine își poate crea DOAR profil de pacient (fără câmpul status).
-      allow create: if isOwner(uid)
-        && request.resource.data.role == 'patient'
-        && request.resource.data.keys().hasOnly(['role', 'name', 'createdAt']);
+      allow create: if
+        // Pacient: își creează singur profilul (fără status).
+        (isOwner(uid)
+          && request.resource.data.role == 'patient'
+          && request.resource.data.keys().hasOnly(['role', 'name', 'createdAt']))
+        ||
+        // Medic: se înscrie singur, dar DOAR cu status „pending” – nu se poate aproba singur.
+        (isOwner(uid)
+          && request.resource.data.role == 'doctor'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.keys().hasOnly(['role', 'status', 'name', 'specialty', 'hospital', 'createdAt']))
+        ||
+        // Adminul poate crea direct conturi de medic (niciodată de admin).
+        (isAdmin() && request.resource.data.role == 'doctor');
 
-      // Rolul și statusul nu pot fi modificate din aplicație.
-      // Conturile de medic se creează/aprobă din consola Firebase.
-      allow update: if isOwner(uid)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status']);
+      allow update: if
+        // Utilizatorul își poate modifica doar date neutre – nu rolul, statusul sau datele profesionale.
+        (isOwner(uid)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'specialty', 'hospital']))
+        ||
+        // Adminul aprobă / respinge / dezactivează medici; nu poate schimba rolul nimănui.
+        (isAdmin() && resource.data.role == 'doctor' && request.resource.data.role == 'doctor');
 
+      allow delete: if false;
+    }
+
+    // doctorApplications/{uid} – cereri de înscriere ale medicilor
+    match /doctorApplications/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if
+        (isOwner(uid)
+          && request.resource.data.status == 'pending'
+          && request.resource.data.keys().hasOnly(
+               ['firstName', 'lastName', 'name', 'email', 'specialty', 'hospital', 'parafa', 'file', 'status', 'createdAt'])
+          && request.resource.data.parafa is string && request.resource.data.parafa.size() <= 8)
+        || isAdmin();
+      allow update: if isAdmin();
       allow delete: if false;
     }
 
@@ -154,10 +184,11 @@ service cloud.firestore {
     }
 
     // doctors/{uid}: { name, specialty, hospital, verified } – director public de medici.
-    // Se completează de administrator din consolă; aplicația doar citește.
+    // Se completează de administrator, din aplicație (aprobare / adăugare directă).
     match /doctors/{uid} {
       allow read: if signedIn();
-      allow write: if false;
+      allow create, update: if isAdmin();
+      allow delete: if false;
     }
 
     // ── Programări ────────────────────────────────────────────

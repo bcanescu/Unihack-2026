@@ -49,7 +49,7 @@ export function LabListItem({ lab, onPress }) {
 }
 
 /** Detaliul unui buletin – folosit și de medic, și de pacient. */
-export function LabDetail({ lab }) {
+export function LabDetail({ lab, onExplain }) {
   const [opening, setOpening] = useState(false);
   const [fileError, setFileError] = useState('');
 
@@ -125,6 +125,10 @@ export function LabDetail({ lab }) {
           <PrimaryButton title="Deschide buletinul (PDF)" variant="outline" onPress={openPdf} loading={opening} />
           {!!fileError && <Text style={{ color: colors.error, fontSize: font.small }}>{fileError}</Text>}
         </View>
+      )}
+
+      {onExplain && lab.results.length > 0 && (
+        <PrimaryButton title="✨  Explică-mi analizele" onPress={onExplain} />
       )}
 
       <Text style={styles.disclaimer}>

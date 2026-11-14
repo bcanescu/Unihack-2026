@@ -12,6 +12,18 @@ const state = {
   labs: {},        // patientUid → { labId → buletin de analize }
   appointments: {}, // appointmentId → programare
   busySlots: {},   // slotId → { doctorUid, date, time, appointmentId }
+  // Directorul public de medici (doctors/{uid} în Firebase). Medici fictivi, spitale reale din Timișoara.
+  doctors: {
+    'medic@demo.ro': { name: 'Dr. Ana Ionescu', specialty: 'Cardiologie', hospital: 'Institutul de Boli Cardiovasculare Timișoara', verified: true },
+    'demo-doc-2': { name: 'Dr. Mihai Popa', specialty: 'Cardiologie', hospital: 'Spitalul Clinic Județean de Urgență Timișoara', verified: true },
+    'demo-doc-3': { name: 'Dr. Elena Radu', specialty: 'Medicină internă', hospital: 'Spitalul Clinic Județean de Urgență Timișoara', verified: true },
+    'demo-doc-4': { name: 'Dr. Andrei Stan', specialty: 'Neurologie', hospital: 'Spitalul Clinic Județean de Urgență Timișoara', verified: true },
+    'demo-doc-5': { name: 'Dr. Ioana Marin', specialty: 'Endocrinologie', hospital: 'Spitalul Clinic Municipal de Urgență Timișoara', verified: true },
+    'demo-doc-6': { name: 'Dr. Cristian Dobre', specialty: 'Pediatrie', hospital: 'Spitalul Clinic de Urgență pentru Copii „Louis Țurcanu”', verified: true },
+    'demo-doc-7': { name: 'Dr. Laura Vlad', specialty: 'Dermatologie', hospital: 'Spitalul Clinic Municipal de Urgență Timișoara', verified: true },
+  },
+  applications: {}, // uid → cerere de înscriere medic (doctorApplications/{uid})
+  accounts: {},     // email → cont creat în demo (medici înscriși / adăugați de admin)
 };
 
 const listeners = new Set();

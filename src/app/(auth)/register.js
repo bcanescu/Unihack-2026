@@ -47,7 +47,6 @@ export default function RegisterScreen() {
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showDoctorInfo, setShowDoctorInfo] = useState(false);
 
   const set = (key) => (value) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -204,24 +203,19 @@ export default function RegisterScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.doctorBox}>
-            <Pressable
-              onPress={() => setShowDoctorInfo((s) => !s)}
-              style={styles.doctorHeader}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: showDoctorInfo }}
-            >
-              <Ionicons name="medkit-outline" size={20} color={colors.primary} />
+          <Pressable
+            onPress={() => router.push('/doctor-signup')}
+            style={({ pressed }) => [styles.doctorBox, styles.doctorHeader, pressed && { opacity: 0.8 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Sunteți medic? Înscrieți-vă ca medic"
+          >
+            <Ionicons name="medkit-outline" size={22} color={colors.primary} />
+            <View style={{ flex: 1 }}>
               <Text style={styles.doctorTitle}>Sunteți medic?</Text>
-              <Ionicons name={showDoctorInfo ? 'chevron-up' : 'chevron-down'} size={20} color={colors.primary} />
-            </Pressable>
-            {showDoctorInfo && (
-              <Text style={styles.doctorText}>
-                Conturile de medic se activează doar după verificarea codului de parafă și a avizului de
-                liberă practică. Scrieți-ne la medici@medly.ro cu aceste date și vă creăm contul.
-              </Text>
-            )}
-          </View>
+              <Text style={styles.doctorText}>Completați formularul de înscriere. Contul se activează după verificarea parafei.</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

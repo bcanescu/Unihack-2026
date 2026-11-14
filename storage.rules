@@ -24,5 +24,16 @@ service firebase.storage {
         && request.resource.contentType == 'application/pdf';
       allow update, delete: if false;
     }
+
+    // Avizul de liberă practică încărcat de medic la înscriere.
+    match /doctorApplications/{uid}/{fileName} {
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow read: if request.auth != null
+        && (request.auth.uid == uid
+            || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow update, delete: if false;
+    }
   }
 }

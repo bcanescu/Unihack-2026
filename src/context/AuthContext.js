@@ -8,7 +8,8 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { auth, db, isFirebaseConfigured } from '../lib/firebase';
+import { ref, uploadBytes } from 'firebase/storage';
+import { auth, db, storage, isFirebaseConfigured } from '../lib/firebase';
 import { validateCnp, hashCnp } from '../lib/cnp';
 import { demoStore } from '../lib/demoStore';
 
@@ -25,11 +26,19 @@ export const DEMO_ACCOUNTS = [
     specialty: 'Cardiologie',
     hospital: 'Institutul de Boli Cardiovasculare Timișoara',
   },
+  { email: 'admin@demo.ro', password: 'demo1234', role: 'admin', name: 'Administrator Medly' },
 ];
+
+/** Codul de eroare pentru un medic care nu e (încă) activ. */
+function doctorStatusError(status) {
+  if (status === 'rejected') return 'app/doctor-rejected';
+  if (status === 'disabled') return 'app/doctor-disabled';
+  return 'app/doctor-pending';
+}
 
 /**
  * Rolul NU se deduce din email. Se citește din documentul users/{uid}
- * (câmpul `role`: "patient" | "doctor"), pe care regulile Firestore
+ * (câmpul `role`: "patient" | "doctor" | "admin"), pe care regulile Firestore
  * nu permit utilizatorului să și-l schimbe singur.
  */
 async function loadProfile(uid) {
@@ -87,8 +96,14 @@ export function AuthProvider({ children }) {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!isFirebaseConfigured) {
-      const demo = DEMO_ACCOUNTS.find((a) => a.email === cleanEmail && a.password === password);
+      const created = demoStore.state.accounts[cleanEmail];
+      const demo =
+        DEMO_ACCOUNTS.find((a) => a.email === cleanEmail && a.password === password) ??
+        (created && created.password === password ? { email: cleanEmail, ...created } : null);
       if (!demo) throw { code: 'auth/invalid-credential' };
+      if (demo.role === 'doctor' && demo.status && demo.status !== 'verified') {
+        throw { code: doctorStatusError(demo.status) };
+      }
       setUser({
         uid: demo.email,
         email: demo.email,
@@ -109,7 +124,7 @@ export function AuthProvider({ children }) {
     }
     if (profile.role === 'doctor' && profile.status !== 'verified') {
       await fbSignOut(auth);
-      throw { code: 'app/doctor-pending' };
+      throw { code: doctorStatusError(profile.status) };
     }
     // onAuthStateChanged setează utilizatorul, iar _layout face redirecționarea.
   }
@@ -172,6 +187,86 @@ export function AuthProvider({ children }) {
     }
   }
 
+  /**
+   * Înscriere medic (formularul de acces). Contul rămâne „pending” până îl aprobă un administrator.
+   *  - users/{uid}              { role: 'doctor', status: 'pending', name, specialty, hospital }
+   *  - doctorApplications/{uid} { firstName, lastName, name, email, specialty, hospital, parafa, file, status }
+   * După trimitere, medicul e delogat: intră în aplicație abia după aprobare.
+   */
+  async function signUpDoctor({ firstName, lastName, email, password, specialty, hospital, parafa }, pdfAsset) {
+    const cleanEmail = email.trim().toLowerCase();
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const name = `Dr. ${first} ${last}`;
+    const code = parafa.trim().toUpperCase();
+
+    if (!isFirebaseConfigured) {
+      if (demoStore.state.accounts[cleanEmail] || DEMO_ACCOUNTS.some((a) => a.email === cleanEmail)) {
+        throw { code: 'auth/email-already-in-use' };
+      }
+      demoStore.state.accounts[cleanEmail] = { password, role: 'doctor', status: 'pending', name, specialty, hospital };
+      demoStore.state.applications[cleanEmail] = {
+        firstName: first,
+        lastName: last,
+        name,
+        email: cleanEmail,
+        specialty,
+        hospital,
+        parafa: code,
+        file: pdfAsset ? { path: pdfAsset.uri, name: pdfAsset.name, demoUri: pdfAsset.uri } : null,
+        status: 'pending',
+        createdAt: new Date(),
+      };
+      demoStore.emit();
+      return;
+    }
+
+    registeringRef.current = true;
+    let created = null;
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+      created = cred.user;
+      const uid = created.uid;
+
+      let file = null;
+      if (pdfAsset) {
+        const path = `doctorApplications/${uid}/aviz.pdf`;
+        const blob = await (await fetch(pdfAsset.uri)).blob();
+        await uploadBytes(ref(storage, path), blob, { contentType: 'application/pdf' });
+        file = { path, name: pdfAsset.name ?? 'aviz.pdf' };
+      }
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', uid), {
+        role: 'doctor',
+        status: 'pending',
+        name,
+        specialty,
+        hospital,
+        createdAt: serverTimestamp(),
+      });
+      batch.set(doc(db, 'doctorApplications', uid), {
+        firstName: first,
+        lastName: last,
+        name,
+        email: cleanEmail,
+        specialty,
+        hospital,
+        parafa: code,
+        file,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      await batch.commit();
+      await fbSignOut(auth);
+    } catch (e) {
+      if (created) await deleteUser(created).catch(() => {});
+      throw e;
+    } finally {
+      registeringRef.current = false;
+    }
+  }
+
   async function signOut() {
     if (isFirebaseConfigured) await fbSignOut(auth);
     setUser(null);
@@ -183,7 +278,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signUpDoctor, signOut, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

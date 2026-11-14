@@ -138,11 +138,11 @@ export default function LoginScreen() {
                 {DEMO_ACCOUNTS.map((a) => (
                   <Pressable key={a.email} onPress={() => fillDemo(a)} style={styles.demoChip} accessibilityRole="button">
                     <Ionicons
-                      name={a.role === 'doctor' ? 'medkit-outline' : 'person-outline'}
+                      name={a.role === 'doctor' ? 'medkit-outline' : a.role === 'admin' ? 'shield-outline' : 'person-outline'}
                       size={18}
                       color={colors.primary}
                     />
-                    <Text style={styles.demoChipText}>{a.role === 'doctor' ? 'Medic' : 'Pacient'}</Text>
+                    <Text style={styles.demoChipText}>{a.role === 'doctor' ? 'Medic' : a.role === 'admin' ? 'Admin' : 'Pacient'}</Text>
                   </Pressable>
                 ))}
               </View>
