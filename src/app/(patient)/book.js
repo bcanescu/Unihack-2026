@@ -1,14 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
-import { useAuth } from '../../context/AuthContext';
-import { subscribePatientLinks } from '../../lib/careLinks';
-import { getDoctors, uniqueSorted } from '../../lib/doctors';
-import { subscribeRatings } from '../../lib/doctorProfile';
-import { RatingInline } from '../../components/Stars';
+import { useAuth } from "../../context/AuthContext";
+import { subscribePatientLinks } from "../../lib/careLinks";
+import { getDoctors, uniqueSorted } from "../../lib/doctors";
+import { subscribeRatings } from "../../lib/doctorProfile";
+import { RatingInline } from "../../components/Stars";
+import DoctorPreview from "../../components/DoctorPreview";
 import {
   subscribeBusy,
   bookAppointment,
@@ -21,20 +29,28 @@ import {
   REASONS,
   PREP,
   SCHEDULE_TEXT,
-} from '../../lib/appointments';
-import { scheduleAppointmentReminders, remindersSupported } from '../../lib/reminders';
-import TopBar from '../../components/TopBar';
-import PrimaryButton from '../../components/PrimaryButton';
-import Chip from '../../components/Chip';
-import { Avatar, Card } from '../../components/ui';
-import { colors, spacing, radius, font } from '../../constants/theme';
+} from "../../lib/appointments";
+import {
+  scheduleAppointmentReminders,
+  remindersSupported,
+} from "../../lib/reminders";
+import TopBar from "../../components/TopBar";
+import PrimaryButton from "../../components/PrimaryButton";
+import Chip from "../../components/Chip";
+import { Avatar, Card } from "../../components/ui";
+import { colors, spacing, radius, font } from "../../constants/theme";
 
-const ALL = 'Toate';
+const ALL = "Toate";
 
 function DoctorOption({ doctor, selected, onPress, linked, rating }) {
   return (
     <View style={{ gap: 4 }}>
-      <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ selected }} accessibilityLabel={doctor.doctorName}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="radio"
+        accessibilityState={{ selected }}
+        accessibilityLabel={doctor.doctorName}
+      >
         <Card style={[styles.doctorRow, selected && styles.doctorSelected]}>
           <Avatar name={doctor.doctorName} />
           <View style={{ flex: 1, gap: 2 }}>
@@ -42,25 +58,46 @@ function DoctorOption({ doctor, selected, onPress, linked, rating }) {
             <Text style={styles.meta}>{doctor.doctorSpecialty}</Text>
             {!!doctor.hospital && (
               <Text style={styles.hospital} numberOfLines={2}>
-                <Ionicons name="business-outline" size={12} color={colors.textMuted} /> {doctor.hospital}
+                <Ionicons
+                  name="business-outline"
+                  size={12}
+                  color={colors.textMuted}
+                />{" "}
+                {doctor.hospital}
               </Text>
             )}
-            <RatingInline avg={rating?.avg} count={rating?.count ?? 0} size={13} />
+            <RatingInline
+              avg={rating?.avg}
+              count={rating?.count ?? 0}
+              size={13}
+            />
             {linked && <Text style={styles.linked}>Medicul tău</Text>}
           </View>
-          <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={24} color={selected ? colors.primary : colors.border} />
+          <Ionicons
+            name={selected ? "radio-button-on" : "radio-button-off"}
+            size={24}
+            color={selected ? colors.primary : colors.border}
+          />
         </Card>
       </Pressable>
       {/* În afara butonului de selecție – altfel pe web ar fi buton în buton. */}
-      <Pressable
-        onPress={() => router.push({ pathname: `/doctor/${doctor.doctorUid}`, params: { fromBooking: '1' } })}
-        style={styles.profileLink}
-        accessibilityRole="button"
-        accessibilityLabel={`Profil și recenzii: ${doctor.doctorName}`}
-      >
-        <Ionicons name="person-circle-outline" size={16} color={colors.primary} />
-        <Text style={styles.profileLinkText}>Profil, experiență și recenzii</Text>
-      </Pressable>
+      {selected ? (
+        <DoctorPreview uid={doctor.doctorUid} />
+      ) : (
+        <Pressable
+          onPress={onPress}
+          style={styles.profileLink}
+          accessibilityRole="button"
+          accessibilityLabel={`Despre medic și recenzii: ${doctor.doctorName}`}
+        >
+          <Ionicons
+            name="person-circle-outline"
+            size={16}
+            color={colors.primary}
+          />
+          <Text style={styles.profileLinkText}>Despre medic și recenzii</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -83,7 +120,7 @@ export default function BookAppointment() {
   const [time, setTime] = useState(null);
   const [reason, setReason] = useState(REASONS[0]);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -95,45 +132,71 @@ export default function BookAppointment() {
   useEffect(
     () =>
       subscribePatientLinks(user.uid, (links) => {
-        const active = links.filter((l) => l.status === 'active');
+        const active = links.filter((l) => l.status === "active");
         setLinkedUids(new Set(active.map((l) => l.doctorUid)));
         setLinkedDocs(active);
         setMode((m) => {
           if (m) return m;
-          if (preselected) return active.some((l) => l.doctorUid === preselected) ? 'mine' : 'search';
-          return active.length > 0 ? 'mine' : 'search';
+          if (preselected)
+            return active.some((l) => l.doctorUid === preselected)
+              ? "mine"
+              : "search";
+          return active.length > 0 ? "mine" : "search";
         });
       }),
-    [user.uid, preselected]
+    [user.uid, preselected],
   );
 
   // Normalizăm: { doctorUid, doctorName, doctorSpecialty, hospital }
   const allDoctors = useMemo(() => {
     const map = new Map();
     (directory ?? []).forEach((d) =>
-      map.set(d.uid, { doctorUid: d.uid, doctorName: d.name, doctorSpecialty: d.specialty, hospital: d.hospital })
+      map.set(d.uid, {
+        doctorUid: d.uid,
+        doctorName: d.name,
+        doctorSpecialty: d.specialty,
+        hospital: d.hospital,
+      }),
     );
     linkedDocs.forEach((l) => {
       if (!map.has(l.doctorUid))
-        map.set(l.doctorUid, { doctorUid: l.doctorUid, doctorName: l.doctorName, doctorSpecialty: l.doctorSpecialty, hospital: '' });
+        map.set(l.doctorUid, {
+          doctorUid: l.doctorUid,
+          doctorName: l.doctorName,
+          doctorSpecialty: l.doctorSpecialty,
+          hospital: "",
+        });
     });
     return map;
   }, [directory, linkedDocs]);
 
-  const myDoctors = [...linkedUids].map((uid) => allDoctors.get(uid)).filter(Boolean);
-  const listed = [...allDoctors.values()].filter((d) => (directory ?? []).some((x) => x.uid === d.doctorUid));
+  const myDoctors = [...linkedUids]
+    .map((uid) => allDoctors.get(uid))
+    .filter(Boolean);
+  const listed = [...allDoctors.values()].filter((d) =>
+    (directory ?? []).some((x) => x.uid === d.doctorUid),
+  );
   const hospitals = uniqueSorted(listed.map((d) => d.hospital));
-  const specialties = uniqueSorted(listed.filter((d) => hospital === ALL || d.hospital === hospital).map((d) => d.doctorSpecialty));
+  const specialties = uniqueSorted(
+    listed
+      .filter((d) => hospital === ALL || d.hospital === hospital)
+      .map((d) => d.doctorSpecialty),
+  );
   const filtered = listed.filter(
-    (d) => (hospital === ALL || d.hospital === hospital) && (specialty === ALL || d.doctorSpecialty === specialty)
+    (d) =>
+      (hospital === ALL || d.hospital === hospital) &&
+      (specialty === ALL || d.doctorSpecialty === specialty),
   );
 
   const doctor = doctorUid ? allDoctors.get(doctorUid) : null;
 
   // Media notelor pentru medicii afișați.
   const [ratings, setRatings] = useState({});
-  const ratingKey = [...allDoctors.keys()].sort().join(',');
-  useEffect(() => subscribeRatings(ratingKey ? ratingKey.split(',') : [], setRatings), [ratingKey]);
+  const ratingKey = [...allDoctors.keys()].sort().join(",");
+  useEffect(
+    () => subscribeRatings(ratingKey ? ratingKey.split(",") : [], setRatings),
+    [ratingKey],
+  );
   const isLinked = doctor && linkedUids.has(doctor.doctorUid);
 
   useEffect(() => {
@@ -148,22 +211,27 @@ export default function BookAppointment() {
   }
 
   const slots = day ? slotsForDay(day) : [];
-  const freeCount = slots.filter((t) => !busy.has(t) && !isPastSlot(day, t)).length;
+  const freeCount = slots.filter(
+    (t) => !busy.has(t) && !isPastSlot(day, t),
+  ).length;
 
   async function confirm() {
     setSaving(true);
-    setError('');
+    setError("");
     try {
       const appt = await bookAppointment(user, doctor, day, time, reason);
-      const labels = await scheduleAppointmentReminders(appt, PREP[reason]).catch(() => []);
+      const labels = await scheduleAppointmentReminders(
+        appt,
+        PREP[reason],
+      ).catch(() => []);
       setDone({ labels });
     } catch (e) {
       setError(
-        e?.code === 'slot-taken'
-          ? 'Ora tocmai a fost ocupată de altcineva. Alege altă oră.'
-          : e?.code === 'rules-denied'
-            ? 'Programarea a fost refuzată de server (permisiuni). Verifică dacă ultima versiune a firestore.rules este publicată.'
-            : 'Programarea nu a putut fi salvată. Încearcă din nou.'
+        e?.code === "slot-taken"
+          ? "Ora tocmai a fost ocupată de altcineva. Alege altă oră."
+          : e?.code === "rules-denied"
+            ? "Programarea a fost refuzată de server (permisiuni). Verifică dacă ultima versiune a firestore.rules este publicată."
+            : "Programarea nu a putut fi salvată. Încearcă din nou.",
       );
       setTime(null);
     } finally {
@@ -182,12 +250,18 @@ export default function BookAppointment() {
           <Text style={styles.text}>
             {doctor?.doctorName} · {formatDayLong(day)}, ora {time}
           </Text>
-          {!!doctor?.hospital && <Text style={styles.text}>{doctor.hospital}</Text>}
+          {!!doctor?.hospital && (
+            <Text style={styles.text}>{doctor.hospital}</Text>
+          )}
           {!!PREP[reason] && (
             <View style={styles.prepBox}>
-              <Ionicons name="information-circle" size={20} color={colors.warning} />
+              <Ionicons
+                name="information-circle"
+                size={20}
+                color={colors.warning}
+              />
               <Text style={styles.prepText}>
-                <Text style={{ fontWeight: '800' }}>Pregătire: </Text>
+                <Text style={{ fontWeight: "800" }}>Pregătire: </Text>
                 {PREP[reason]}
               </Text>
             </View>
@@ -196,14 +270,17 @@ export default function BookAppointment() {
             <Ionicons name="notifications" size={18} color={colors.primary} />
             <Text style={styles.reminderText}>
               {!remindersSupported
-                ? 'Pe telefon primești remindere înainte de programare.'
+                ? "Pe telefon primești remindere înainte de programare."
                 : done.labels?.length
-                  ? `Îți vom aminti ${done.labels.join(' și ')}.`
-                  : 'Activează notificările pentru Medly ca să primești remindere.'}
+                  ? `Îți vom aminti ${done.labels.join(" și ")}.`
+                  : "Activează notificările pentru Medly ca să primești remindere."}
             </Text>
           </View>
-          <View style={{ alignSelf: 'stretch', marginTop: spacing.md }}>
-            <PrimaryButton title="Vezi programările mele" onPress={() => router.replace('/appointments')} />
+          <View style={{ alignSelf: "stretch", marginTop: spacing.md }}>
+            <PrimaryButton
+              title="Vezi programările mele"
+              onPress={() => router.replace("/appointments")}
+            />
           </View>
         </View>
       </SafeAreaView>
@@ -219,8 +296,8 @@ export default function BookAppointment() {
           <Text style={styles.label}>1. Alege medicul</Text>
           <View style={styles.segment}>
             {[
-              ['mine', `Medicii mei (${myDoctors.length})`],
-              ['search', 'Caută medic'],
+              ["mine", `Medicii mei (${myDoctors.length})`],
+              ["search", "Caută medic"],
             ].map(([key, label]) => (
               <Pressable
                 key={key}
@@ -229,39 +306,73 @@ export default function BookAppointment() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: mode === key }}
               >
-                <Text style={[styles.segmentText, mode === key && { color: '#fff' }]}>{label}</Text>
+                <Text
+                  style={[
+                    styles.segmentText,
+                    mode === key && { color: "#fff" },
+                  ]}
+                >
+                  {label}
+                </Text>
               </Pressable>
             ))}
           </View>
 
-          {mode === 'mine' &&
+          {mode === "mine" &&
             (myDoctors.length === 0 ? (
-              <Text style={styles.meta}>Nu ai încă medici conectați. Folosește „Caută medic”.</Text>
+              <Text style={styles.meta}>
+                Nu ai încă medici conectați. Folosește „Caută medic”.
+              </Text>
             ) : (
               myDoctors.map((d) => (
-                <DoctorOption key={d.doctorUid} doctor={d} linked rating={ratings[d.doctorUid]} selected={d.doctorUid === doctorUid} onPress={() => setDoctorUid(d.doctorUid)} />
+                <DoctorOption
+                  key={d.doctorUid}
+                  doctor={d}
+                  linked
+                  rating={ratings[d.doctorUid]}
+                  selected={d.doctorUid === doctorUid}
+                  onPress={() => setDoctorUid(d.doctorUid)}
+                />
               ))
             ))}
 
-          {mode === 'search' &&
+          {mode === "search" &&
             (directory === null ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
               <>
                 <Text style={styles.subLabel}>Spital</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.hScroll}
+                >
                   {[ALL, ...hospitals].map((h) => (
-                    <Chip key={h} label={h} selected={hospital === h} onPress={() => chooseHospital(h)} />
+                    <Chip
+                      key={h}
+                      label={h}
+                      selected={hospital === h}
+                      onPress={() => chooseHospital(h)}
+                    />
                   ))}
                 </ScrollView>
                 <Text style={styles.subLabel}>Specializare</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.hScroll}
+                >
                   {[ALL, ...specialties].map((s) => (
-                    <Chip key={s} label={s} selected={specialty === s} onPress={() => setSpecialty(s)} />
+                    <Chip
+                      key={s}
+                      label={s}
+                      selected={specialty === s}
+                      onPress={() => setSpecialty(s)}
+                    />
                   ))}
                 </ScrollView>
                 <Text style={styles.meta}>
-                  {filtered.length} {filtered.length === 1 ? 'medic' : 'medici'}
+                  {filtered.length} {filtered.length === 1 ? "medic" : "medici"}
                 </Text>
                 {filtered.map((d) => (
                   <DoctorOption
@@ -281,18 +392,33 @@ export default function BookAppointment() {
           <>
             {!isLinked && (
               <View style={styles.privacy}>
-                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={18}
+                  color={colors.primary}
+                />
                 <Text style={styles.privacyText}>
-                  {doctor.doctorName} va vedea doar numele tău și motivul programării. Dosarul medical rămâne privat
-                  până accepți o cerere de acces.
+                  {doctor.doctorName} va vedea doar numele tău și motivul
+                  programării. Dosarul medical rămâne privat până accepți o
+                  cerere de acces.
                 </Text>
               </View>
             )}
 
+            <Text style={styles.nextHint}>
+              Mai jos alege ziua și ora consultației cu {doctor.doctorName}.
+            </Text>
+
             {/* 2. Ziua */}
             <View style={styles.group}>
-              <Text style={styles.label}>2. Ziua · <Text style={styles.metaInline}>{SCHEDULE_TEXT}</Text></Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+              <Text style={styles.label}>
+                2. Ziua · <Text style={styles.metaInline}>{SCHEDULE_TEXT}</Text>
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: spacing.sm }}
+              >
                 {days.map((k) => {
                   const f = formatDayShort(k);
                   const work = isWorkDay(k);
@@ -302,14 +428,30 @@ export default function BookAppointment() {
                       key={k}
                       disabled={!work}
                       onPress={() => setDay(k)}
-                      style={[styles.dayChip, selected && styles.dayChipOn, !work && { opacity: 0.35 }]}
+                      style={[
+                        styles.dayChip,
+                        selected && styles.dayChipOn,
+                        !work && { opacity: 0.35 },
+                      ]}
                       accessibilityRole="button"
                       accessibilityState={{ selected, disabled: !work }}
                       accessibilityLabel={formatDayLong(k)}
                     >
-                      <Text style={[styles.dayWeek, selected && { color: '#fff' }]}>{f.weekday}</Text>
-                      <Text style={[styles.dayNum, selected && { color: '#fff' }]}>{f.day}</Text>
-                      <Text style={[styles.dayMonth, selected && { color: '#fff' }]}>{f.month}</Text>
+                      <Text
+                        style={[styles.dayWeek, selected && { color: "#fff" }]}
+                      >
+                        {f.weekday}
+                      </Text>
+                      <Text
+                        style={[styles.dayNum, selected && { color: "#fff" }]}
+                      >
+                        {f.day}
+                      </Text>
+                      <Text
+                        style={[styles.dayMonth, selected && { color: "#fff" }]}
+                      >
+                        {f.month}
+                      </Text>
                     </Pressable>
                   );
                 })}
@@ -319,10 +461,13 @@ export default function BookAppointment() {
             {/* 3. Ora */}
             <View style={styles.group}>
               <Text style={styles.label}>
-                3. Ora · <Text style={styles.metaInline}>{freeCount} libere</Text>
+                3. Ora ·{" "}
+                <Text style={styles.metaInline}>{freeCount} libere</Text>
               </Text>
               {slots.length === 0 ? (
-                <Text style={styles.meta}>Medicul nu are program în această zi.</Text>
+                <Text style={styles.meta}>
+                  Medicul nu are program în această zi.
+                </Text>
               ) : (
                 <View style={styles.slots}>
                   {slots.map((t) => {
@@ -335,12 +480,24 @@ export default function BookAppointment() {
                         key={t}
                         disabled={disabled}
                         onPress={() => setTime(t)}
-                        style={[styles.slot, selected && styles.slotOn, disabled && styles.slotOff]}
+                        style={[
+                          styles.slot,
+                          selected && styles.slotOn,
+                          disabled && styles.slotOff,
+                        ]}
                         accessibilityRole="button"
                         accessibilityState={{ selected, disabled }}
-                        accessibilityLabel={`Ora ${t}${taken ? ', ocupat' : past ? ', trecut' : ''}`}
+                        accessibilityLabel={`Ora ${t}${taken ? ", ocupat" : past ? ", trecut" : ""}`}
                       >
-                        <Text style={[styles.slotText, selected && { color: '#fff' }, disabled && styles.slotTextOff]}>{t}</Text>
+                        <Text
+                          style={[
+                            styles.slotText,
+                            selected && { color: "#fff" },
+                            disabled && styles.slotTextOff,
+                          ]}
+                        >
+                          {t}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -353,14 +510,23 @@ export default function BookAppointment() {
               <Text style={styles.label}>4. Motiv</Text>
               <View style={styles.chipsRow}>
                 {REASONS.map((r) => (
-                  <Chip key={r} label={r} selected={r === reason} onPress={() => setReason(r)} />
+                  <Chip
+                    key={r}
+                    label={r}
+                    selected={r === reason}
+                    onPress={() => setReason(r)}
+                  />
                 ))}
               </View>
             </View>
 
             {!!PREP[reason] && (
               <View style={styles.prepBox}>
-                <Ionicons name="information-circle" size={20} color={colors.warning} />
+                <Ionicons
+                  name="information-circle"
+                  size={20}
+                  color={colors.warning}
+                />
                 <Text style={styles.prepText}>{PREP[reason]}</Text>
               </View>
             )}
@@ -368,7 +534,11 @@ export default function BookAppointment() {
             {!!error && <Text style={styles.error}>{error}</Text>}
 
             <PrimaryButton
-              title={time ? `Fă programarea · ${formatDayShort(day).day} ${formatDayShort(day).month}, ${time}` : 'Alege o oră'}
+              title={
+                time
+                  ? `Fă programarea · ${formatDayShort(day).day} ${formatDayShort(day).month}, ${time}`
+                  : "Alege o oră"
+              }
               onPress={confirm}
               loading={saving}
               disabled={!time}
@@ -382,54 +552,172 @@ export default function BookAppointment() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  container: { padding: spacing.lg, paddingTop: spacing.sm, gap: spacing.lg, maxWidth: 560, width: '100%', alignSelf: 'center' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  bigIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.successSoft, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: font.title, fontWeight: '800', color: colors.text },
-  text: { fontSize: font.body, color: colors.textMuted, textAlign: 'center' },
+  container: {
+    padding: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.lg,
+    maxWidth: 560,
+    width: "100%",
+    alignSelf: "center",
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+  },
+  bigIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.successSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  title: { fontSize: font.title, fontWeight: "800", color: colors.text },
+  text: { fontSize: font.body, color: colors.textMuted, textAlign: "center" },
   group: { gap: spacing.sm + 2 },
-  label: { fontSize: font.body + 1, fontWeight: '800', color: colors.text },
-  subLabel: { fontSize: font.small, fontWeight: '700', color: colors.textMuted, marginTop: spacing.xs },
+  label: { fontSize: font.body + 1, fontWeight: "800", color: colors.text },
+  subLabel: {
+    fontSize: font.small,
+    fontWeight: "700",
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
   meta: { fontSize: font.small, color: colors.textMuted },
-  metaInline: { fontSize: font.small, color: colors.textMuted, fontWeight: '500' },
-  hospital: { fontSize: font.small - 1, color: colors.textMuted, lineHeight: 17 },
-  profileLink: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, minHeight: 30 },
-  profileLinkText: { color: colors.primary, fontWeight: '700', fontSize: font.small },
-  linked: { fontSize: font.small - 2, fontWeight: '700', color: colors.success, marginTop: 2 },
+  metaInline: {
+    fontSize: font.small,
+    color: colors.textMuted,
+    fontWeight: "500",
+  },
+  hospital: {
+    fontSize: font.small - 1,
+    color: colors.textMuted,
+    lineHeight: 17,
+  },
+  nextHint: {
+    fontSize: font.small,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
+  profileLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    minHeight: 30,
+  },
+  profileLinkText: {
+    color: colors.primary,
+    fontWeight: "700",
+    fontSize: font.small,
+  },
+  linked: {
+    fontSize: font.small - 2,
+    fontWeight: "700",
+    color: colors.success,
+    marginTop: 2,
+  },
   hScroll: { gap: spacing.sm, paddingRight: spacing.md },
-  segment: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.pill, padding: 4 },
-  segmentBtn: { flex: 1, minHeight: 42, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  segment: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    padding: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   segmentOn: { backgroundColor: colors.primary },
-  segmentText: { fontSize: font.small + 1, fontWeight: '700', color: colors.text },
-  doctorRow: { flexDirection: 'row', alignItems: 'center' },
+  segmentText: {
+    fontSize: font.small + 1,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  doctorRow: { flexDirection: "row", alignItems: "center" },
   doctorSelected: { borderColor: colors.primary, borderWidth: 2 },
-  doctorName: { fontSize: font.body + 1, fontWeight: '700', color: colors.text },
-  privacy: { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.accentSoft },
-  privacyText: { flex: 1, fontSize: font.small, color: colors.text, lineHeight: 19 },
-  dayChip: { width: 62, paddingVertical: 10, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
+  doctorName: {
+    fontSize: font.body + 1,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  privacy: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentSoft,
+  },
+  privacyText: {
+    flex: 1,
+    fontSize: font.small,
+    color: colors.text,
+    lineHeight: 19,
+  },
+  dayChip: {
+    width: 62,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: "center",
+  },
   dayChipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  dayWeek: { fontSize: 12, fontWeight: '700', color: colors.textMuted, textTransform: 'capitalize' },
-  dayNum: { fontSize: 22, fontWeight: '800', color: colors.text },
+  dayWeek: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textMuted,
+    textTransform: "capitalize",
+  },
+  dayNum: { fontSize: 22, fontWeight: "800", color: colors.text },
   dayMonth: { fontSize: 12, color: colors.textMuted },
-  slots: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  slots: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   slot: {
-    width: '23%',
+    width: "23%",
     minWidth: 72,
     minHeight: 48,
     borderRadius: radius.md,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   slotOn: { backgroundColor: colors.primary },
   slotOff: { borderColor: colors.surface, backgroundColor: colors.surface },
-  slotText: { fontSize: font.body, fontWeight: '700', color: colors.primary },
-  slotTextOff: { color: '#94A3B8', textDecorationLine: 'line-through' },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  prepBox: { flexDirection: 'row', gap: spacing.sm, alignSelf: 'stretch', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.warningSoft },
-  prepText: { flex: 1, fontSize: font.small + 1, color: colors.warning, lineHeight: 20 },
-  reminderBox: { flexDirection: 'row', gap: spacing.sm, alignSelf: 'stretch', padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.accentSoft },
-  reminderText: { flex: 1, fontSize: font.small + 1, color: colors.text, lineHeight: 20 },
+  slotText: { fontSize: font.body, fontWeight: "700", color: colors.primary },
+  slotTextOff: { color: "#94A3B8", textDecorationLine: "line-through" },
+  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  prepBox: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignSelf: "stretch",
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.warningSoft,
+  },
+  prepText: {
+    flex: 1,
+    fontSize: font.small + 1,
+    color: colors.warning,
+    lineHeight: 20,
+  },
+  reminderBox: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignSelf: "stretch",
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentSoft,
+  },
+  reminderText: {
+    flex: 1,
+    fontSize: font.small + 1,
+    color: colors.text,
+    lineHeight: 20,
+  },
   error: { color: colors.error, fontSize: font.small + 1 },
 });
