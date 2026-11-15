@@ -66,6 +66,14 @@ const state = {
     'demo-doc-7': { name: 'Dr. Laura Vlad', specialty: 'Dermatologie', hospital: 'Spitalul Clinic Municipal de Urgență Timișoara', verified: true },
   },
   applications: {}, // uid → cerere de înscriere medic (doctorApplications/{uid})
+  // Evaluări ale spitalelor (hospitalReviews/{appointmentId}) – exemple fictive pentru modul demo.
+  hospitalReviews: {
+    'demo-h1': { hospital: 'Institutul de Boli Cardiovasculare Timișoara', patientUid: 'demo-p1', authorName: 'Maria D.', cleanliness: 5, staff: 4, facilities: 4, issues: ['Așteptare lungă'], comment: 'Curat și bine organizat, dar am așteptat 40 de minute.', createdAt: new Date('2026-10-02T14:10:00') },
+    'demo-h2': { hospital: 'Institutul de Boli Cardiovasculare Timișoara', patientUid: 'demo-p2', authorName: 'Gheorghe T.', cleanliness: 4, staff: 5, facilities: 3, issues: ['Lipsă locuri de așteptare', 'Parcare dificilă'], comment: 'Asistentele foarte amabile. Sala de așteptare e mică.', createdAt: new Date('2026-10-21T11:40:00') },
+    'demo-h3': { hospital: 'Institutul de Boli Cardiovasculare Timișoara', patientUid: 'demo-p3', authorName: 'Elena V.', cleanliness: 5, staff: 5, facilities: 4, issues: [], comment: '', createdAt: new Date('2026-11-04T10:10:00') },
+    'demo-h4': { hospital: 'Spitalul Clinic Județean de Urgență Timișoara', patientUid: 'demo-p1', authorName: 'Maria D.', cleanliness: 3, staff: 4, facilities: 2, issues: ['Toalete murdare', 'Așteptare lungă', 'Greu de găsit cabinetul'], comment: 'Medicul foarte bun, dar clădirea are nevoie de renovare.', createdAt: new Date('2026-09-15T09:20:00') },
+    'demo-h5': { hospital: 'Spitalul Clinic Județean de Urgență Timișoara', patientUid: 'demo-p4', authorName: 'Andrei M.', cleanliness: 3, staff: 3, facilities: 3, issues: ['Așteptare lungă'], comment: 'Aglomerat.', createdAt: new Date('2026-10-30T12:00:00') },
+  },
   // Recenzii (reviews/{appointmentId}) – exemple fictive pentru modul demo.
   reviews: {
     'demo-r1': { doctorUid: 'medic@demo.ro', patientUid: 'demo-p1', authorName: 'Maria D.', rating: 5, comment: 'Foarte răbdătoare, mi-a explicat fiecare analiză și am plecat liniștită.', appointmentDate: '2026-10-02', reason: 'Consult', createdAt: new Date('2026-10-02T14:00:00') },
