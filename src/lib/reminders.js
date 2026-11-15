@@ -3,7 +3,8 @@
  * Strategie simplă: la fiecare schimbare a tratamentului, anulăm toate reminderele și le reprogramăm,
  * câte unul zilnic pentru fiecare oră în care pacientul are de luat ceva.
  */
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dateKey, isActiveOn } from './medications';
@@ -50,19 +51,72 @@ export async function setRemindersEnabled(on) {
   if (!on && remindersSupported) await cancelMedicationReminders();
 }
 
-/** Cere permisiunea pentru notificări. Returnează true dacă e acordată. */
-export async function ensurePermission() {
-  if (!remindersSupported) return false;
-  if (Platform.OS === 'android') {
+// Canalul Android „Medicație”. În unele versiuni de Expo Go crearea canalului aruncă o eroare nativă
+// (NullPointerException) – atunci folosim canalul implicit, iar notificările merg oricum.
+let channelReady = null; // null = neîncercat, true/false = rezultat
+
+async function ensureChannel() {
+  if (Platform.OS !== 'android') return false;
+  if (channelReady !== null) return channelReady;
+  try {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Medicație',
+      description: 'Remindere pentru medicamente și programări',
       importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0F766E',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      enableVibrate: true,
+      showBadge: false,
     });
+    channelReady = true;
+  } catch (e) {
+    console.warn('[notificări] canalul Android nu a putut fi creat, folosesc canalul implicit:', e?.message);
+    channelReady = false;
   }
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-  const asked = await Notifications.requestPermissionsAsync();
-  return asked.granted;
+  return channelReady;
+}
+
+/** channelId doar dacă avem canalul nostru; altfel Android folosește canalul implicit. */
+async function channelPart() {
+  return (await ensureChannel()) ? { channelId: CHANNEL_ID } : {};
+}
+
+/** Rulează în Expo Go? Atunci permisiunea de notificări aparține aplicației „Expo Go”, nu „Medly”. */
+export const inExpoGo = Constants.executionEnvironment === 'storeClient';
+
+/**
+ * Cere permisiunea pentru notificări.
+ * Returnează { ok, canAskAgain, error } – ca ecranul să poată explica exact ce nu merge.
+ */
+export async function requestNotificationPermission() {
+  if (!remindersSupported) return { ok: false, canAskAgain: false, error: 'web' };
+  try {
+    await ensureChannel();
+    const current = await Notifications.getPermissionsAsync();
+    if (current.granted || current.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
+      return { ok: true };
+    }
+    if (current.canAskAgain === false) return { ok: false, canAskAgain: false };
+    const asked = await Notifications.requestPermissionsAsync({
+      ios: { allowAlert: true, allowSound: true, allowBadge: false },
+    });
+    return { ok: !!asked.granted, canAskAgain: asked.canAskAgain !== false };
+  } catch (e) {
+    console.warn('[notificări] permisiune', e?.message);
+    return { ok: false, canAskAgain: true, error: e?.message || String(e) };
+  }
+}
+
+/** Variantă simplă (true/false), folosită de restul aplicației. */
+export async function ensurePermission() {
+  return (await requestNotificationPermission()).ok;
+}
+
+/** Deschide setările aplicației (pentru când permisiunea a fost refuzată definitiv). */
+export function openNotificationSettings() {
+  return Linking.openSettings().catch(() => {});
 }
 
 /** Reprogramează reminderele pe baza tratamentului curent. */
@@ -92,7 +146,7 @@ export async function syncReminders(meds) {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour,
         minute,
-        channelId: CHANNEL_ID,
+        ...(await channelPart()),
       },
     });
   }
@@ -107,7 +161,7 @@ export async function sendTestReminder(seconds = 5) {
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds,
-      channelId: CHANNEL_ID,
+      ...(await channelPart()),
     },
   });
 }
@@ -172,7 +226,7 @@ export async function scheduleAppointmentReminders(appt, prep) {
     ids.push(
       await Notifications.scheduleNotificationAsync({
         content: { title: p.title, body: p.body, data: { url: '/appointments' } },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, channelId: CHANNEL_ID },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: p.at, ...(await channelPart()) },
       })
     );
   }

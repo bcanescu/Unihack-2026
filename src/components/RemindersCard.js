@@ -5,7 +5,9 @@ import {
   remindersSupported,
   getRemindersEnabled,
   setRemindersEnabled,
-  ensurePermission,
+  requestNotificationPermission,
+  openNotificationSettings,
+  inExpoGo,
   syncReminders,
   sendTestReminder,
 } from '../lib/reminders';
@@ -31,25 +33,42 @@ export default function RemindersCard({ meds }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, medsKey]);
 
+  const [needsSettings, setNeedsSettings] = useState(false);
+  const appName = inExpoGo ? 'Expo Go' : 'Medly';
+
+  async function askPermission() {
+    const r = await requestNotificationPermission();
+    setNeedsSettings(!r.ok && r.canAskAgain === false);
+    if (!r.ok) {
+      setMsg(
+        r.error
+          ? `Notificările nu au putut fi activate: ${r.error}`
+          : r.canAskAgain === false
+            ? `Notificările sunt blocate pentru ${appName}. Deschide setările și activează-le, apoi încearcă din nou.`
+            : `Ai refuzat notificările. Apasă din nou și alege „Permite”.`,
+      );
+    }
+    return r.ok;
+  }
+
   async function toggle(next) {
     setMsg('');
-    if (next) {
-      const ok = await ensurePermission().catch(() => false);
-      if (!ok) {
-        setMsg('Permite notificările pentru Medly din setările telefonului.');
-        return;
-      }
-    }
+    if (next && !(await askPermission())) return;
     await setRemindersEnabled(next);
     setEnabled(next);
     if (!next) setCount(0);
+    if (next) setMsg('Remindere activate.');
   }
 
   async function test() {
-    const ok = await ensurePermission().catch(() => false);
-    if (!ok) return setMsg('Permite notificările pentru Medly din setările telefonului.');
-    await sendTestReminder(5);
-    setMsg('Reminder de test trimis – apare în 5 secunde.');
+    setMsg('');
+    if (!(await askPermission())) return;
+    try {
+      await sendTestReminder(5);
+      setMsg('Reminder de test trimis – apare în 5 secunde (poți ieși din aplicație).');
+    } catch (e) {
+      setMsg(`Reminderul de test nu a putut fi programat: ${e?.message || e}`);
+    }
   }
 
   if (!remindersSupported) {
@@ -87,7 +106,17 @@ export default function RemindersCard({ meds }) {
           <Text style={styles.link}>Trimite un reminder de test</Text>
         </Pressable>
       )}
+      {!enabled && (
+        <Pressable onPress={test} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
+          <Text style={styles.link}>Testează notificările</Text>
+        </Pressable>
+      )}
       {!!msg && <Text style={styles.msg}>{msg}</Text>}
+      {needsSettings && (
+        <Pressable onPress={openNotificationSettings} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
+          <Text style={styles.link}>Deschide setările telefonului</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
